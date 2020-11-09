@@ -1,0 +1,28 @@
+---
+title: "Some Tests"
+author: "Christian Peters"
+date: "9 11 2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r}
+library(readr)
+library(tibble)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+data_location = "data/"
+context_o2 = read_csv(paste0(data_location, "campus/1544432926_o2_context.txt"), col_types=cols())
+glimpse(context_o2)
+```
+
+```{r}
+ul_o2 = read_csv(paste0(data_location, "campus/1544432926_o2_ul.txt"), col_types=cols())
+glimpse(ul_o2)
+```
