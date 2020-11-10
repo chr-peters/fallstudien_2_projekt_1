@@ -1,0 +1,67 @@
+---
+title: "Make Datasets"
+author: "Christian Peters"
+date: "9 11 2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(lubridate)
+```
+
+```{r}
+get_provider_by_filename = function(filename) {
+  split_result = str_split(filename, "_")
+  return(split_result[[1]][2])
+}
+```
+
+```{r}
+get_datatype_by_filename = function(filename) {
+  split_result = str_split(filename, "_")
+  ending = split_result[[1]][3]
+  split_result_ending = str_split(ending, "\\.")
+  return(split_result_ending[[1]][1])
+}
+```
+
+```{r}
+make_dataset = function(data_location, datatype) {
+  datasets = list()
+  scenarios = c("urban", "suburban", "campus", "highway")
+  for (cur_scenario in scenarios) {
+    cur_path = str_c(data_location, "/", cur_scenario)
+    data_files = list.files(cur_path)
+    for (cur_filename in data_files) {
+      cur_datatype = get_datatype_by_filename(cur_filename)
+      if (cur_datatype != datatype) {
+        next
+      }
+      cur_provider = get_provider_by_filename(cur_filename)
+      cur_dataset = read_csv(str_c(cur_path, "/", cur_filename), col_type=cols()) %>%
+        mutate(scenario=cur_scenario, provider=cur_provider)
+      datasets[[length(datasets)+1]] = cur_dataset
+    }
+  }
+  final_dataset = bind_rows(datasets) %>% 
+    mutate(timestamp=as_datetime(timestamp_ms)) %>% 
+    arrange(timestamp)
+  return(final_dataset)
+}
+```
+
+```{r}
+dataset_ul = make_dataset("data/", datatype="ul")
+glimpse(dataset_ul)
+```
+
+```{r}
+#write_csv(dataset_ul, "dataset_ul.csv")
+```
