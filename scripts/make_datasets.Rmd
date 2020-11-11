@@ -1,0 +1,117 @@
+---
+title: "Make Datasets"
+author: "Christian Peters"
+date: "9 11 2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(lubridate)
+```
+
+Define where to get the data from and where to put the resulting data sets:
+```{r}
+data_source_dir = "../data_raw/"
+data_destination_dir = "../datasets/"
+```
+
+Define helper functions that get information from a filename:
+```{r}
+get_provider_by_filename = function(filename) {
+  split_result = str_split(filename, "_")
+  return(split_result[[1]][2])
+}
+
+# example:
+get_provider_by_filename("1544519617_vodafone_ul.txt")
+```
+
+```{r}
+get_datatype_by_filename = function(filename) {
+  split_result = str_split(filename, "_")
+  ending = split_result[[1]][3]
+  split_result_ending = str_split(ending, "\\.")
+  return(split_result_ending[[1]][1])
+}
+
+# example:
+get_datatype_by_filename("1544519617_vodafone_ul.txt")
+```
+
+This function creates a dataset for a given `datatype` like "ul", "dl", "context" or cells.
+The provider is added as an extra column as well as the scenario.
+```{r}
+make_dataset = function(data_location, datatype) {
+  
+  # read all datasets and store them in a list to combine them later
+  datasets = list()
+  
+  scenarios = c("urban", "suburban", "campus", "highway")
+  for (cur_scenario in scenarios) {
+    
+    # get the current path where the files are located and list the files
+    cur_path = str_c(data_location, "/", cur_scenario)
+    data_files = list.files(cur_path)
+    
+    # now read each file
+    for (cur_filename in data_files) {
+      
+      # only read when the datatype matches the one we want
+      cur_datatype = get_datatype_by_filename(cur_filename)
+      if (cur_datatype != datatype) {
+        next
+      }
+      
+      # read the file and add a column for the provider and for the scenario
+      cur_provider = get_provider_by_filename(cur_filename)
+      cur_dataset = read_csv(str_c(cur_path, "/", cur_filename), col_type=cols()) %>%
+        mutate(scenario=cur_scenario, provider=cur_provider)
+      
+      # attach it to the list
+      datasets[[length(datasets)+1]] = cur_dataset
+    }
+  }
+  
+  # build the final dataset, convert the seconds to proper dates and sort by time
+  final_dataset = bind_rows(datasets) %>% 
+    mutate(timestamp=as_datetime(timestamp_ms)) %>% 
+    arrange(timestamp)
+  return(final_dataset)
+}
+```
+
+Now create the data sets:
+```{r}
+dataset_ul = make_dataset(data_source_dir, datatype="ul")
+glimpse(dataset_ul)
+```
+
+```{r}
+dataset_dl = make_dataset(data_source_dir, datatype="dl")
+glimpse(dataset_dl)
+```
+
+```{r}
+dataset_context = make_dataset(data_source_dir, datatype="context")
+glimpse(dataset_context)
+```
+
+```{r}
+dataset_cells = make_dataset(data_source_dir, datatype="cells")
+glimpse(dataset_cells)
+```
+
+Store them:
+```{r}
+# write_csv(dataset_ul, str_c(data_destination_dir, "dataset_ul.csv"))
+# write_csv(dataset_dl, str_c(data_destination_dir, "dataset_dl.csv"))
+# write_csv(dataset_context, str_c(data_destination_dir, "dataset_context.csv"))
+# write_csv(dataset_cells, str_c(data_destination_dir, "dataset_cells.csv"))
+```
