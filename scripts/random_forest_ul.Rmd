@@ -1,0 +1,81 @@
+---
+title: "Random Forest Upload Rate Prediction"
+author: "Christian Peters"
+date: "11 11 2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message = FALSE}
+library(mlr3)
+library(mlr3learners)
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+data_dir = "../datasets/"
+dataset_ul = read_csv(str_c(data_dir, "dataset_ul.csv"), col_types = cols())
+dataset_ul_prediction = dataset_ul %>% select(
+  scenario,
+  provider,
+  velocity_mps,
+  acceleration_mpss,
+  rsrp_dbm,
+  rsrq_db,
+  rssnr_db,
+  cqi,
+  ta,
+  throughput_mbits
+)
+
+# remove missing values
+dataset_ul_prediction = dataset_ul_prediction %>% drop_na()
+glimpse(dataset_ul_prediction)
+```
+
+```{r}
+task = TaskRegr$new(
+  id = "ul_prediction",
+  backend = dataset_ul_prediction,
+  target = "throughput_mbits"
+)
+task
+```
+
+```{r}
+learner_random_forest = mlr_learners$get("regr.ranger")
+```
+
+```{r}
+resampling = rsmp("holdout", ratio = 0.8)
+result = resample(
+  task = task, 
+  learner = learner_random_forest, 
+  resampling = resampling
+)
+result
+```
+
+```{r}
+# get r^2
+result$aggregate(msr("regr.rsq"))
+
+# get MSE
+result$aggregate(msr("regr.mse"))
+
+# get MAE
+result$aggregate(msr("regr.mae"))
+```
+
+```{r}
+predictions = as.data.table(result$prediction())
+ggplot(predictions) +
+  geom_point(aes(x=truth, y=response)) +
+  ggtitle("Random Forest Out of Sample Predictions")
+```
