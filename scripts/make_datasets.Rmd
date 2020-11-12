@@ -1,7 +1,5 @@
 ---
 title: "Make Datasets"
-author: "Christian Peters"
-date: "9 11 2020"
 output:
   pdf_document: default
   html_document: default

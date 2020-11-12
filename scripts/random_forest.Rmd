@@ -1,7 +1,5 @@
 ---
-title: "Random Forest Upload Rate Prediction"
-author: "Christian Peters"
-date: "11 11 2020"
+title: "Random Forest"
 output:
   pdf_document: default
   html_document: default
@@ -14,9 +12,12 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r, message = FALSE}
 library(mlr3)
 library(mlr3learners)
+library(mlr3filters)
 library(tidyverse)
 library(ggplot2)
 ```
+
+# Upload Rate Prediction
 
 ```{r}
 data_dir = "../datasets/"
@@ -78,4 +79,31 @@ predictions = as.data.table(result$prediction())
 ggplot(predictions) +
   geom_point(aes(x=truth, y=response)) +
   ggtitle("Random Forest Out of Sample Predictions")
+```
+
+## Feature Importance
+
+```{r}
+filter_permutation = flt("permutation",
+  learner = learner_random_forest,
+  resampling = rsmp("holdout", ratio=0.8),
+  measure = msr("regr.mae"),
+  standardize = TRUE,
+  nmc=5
+)
+filter_permutation$calculate(task)
+```
+
+```{r}
+filter_permutation_results = as.data.table(filter_permutation)
+filter_permutation_results
+```
+
+```{r}
+ggplot(filter_permutation_results) +
+  geom_bar(aes(x = reorder(feature, -score), y = score), stat="identity") +
+  xlab("feature") +
+  ylab("MAE difference") +
+  scale_x_discrete(guide = guide_axis(angle = 20)) +
+  ggtitle("Permutation Feature Importance")
 ```
