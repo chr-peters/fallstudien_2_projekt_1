@@ -1,0 +1,83 @@
+---
+title: "xgboost"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE}
+library(mlr3)
+library(mlr3learners)
+library(mlr3filters)
+library(tidyverse)
+library(ggplot2)
+```
+
+# xgboost Upload Rate Prediction
+
+```{r}
+data_dir = "../datasets/"
+dataset_ul = read_csv(str_c(data_dir, "dataset_ul.csv"), col_types = cols(scenario=col_factor()))
+dataset_ul_prediction = dataset_ul %>% select(
+  # TODO: encode scenario as described here:
+  # https://mlr3gallery.mlr-org.com/posts/2020-01-31-encode-factors-for-xgboost/
+  #scenario,
+  velocity_mps,
+  acceleration_mpss,
+  rsrp_dbm,
+  rsrq_db,
+  rssnr_db,
+  cqi,
+  ta,
+  payload_mb,
+  f_mhz,
+  throughput_mbits
+)
+
+# remove missing values
+dataset_ul_prediction = dataset_ul_prediction %>% drop_na()
+glimpse(dataset_ul_prediction)
+```
+
+```{r}
+task = TaskRegr$new(
+  id = "ul_prediction",
+  backend = dataset_ul_prediction,
+  target = "throughput_mbits"
+)
+task
+```
+
+```{r}
+learner_xgboost = lrn("regr.xgboost", nrounds=10)
+```
+
+```{r}
+resampling = rsmp("holdout", ratio = 0.8)
+result = resample(
+  task = task, 
+  learner = learner_xgboost, 
+  resampling = resampling
+)
+result
+```
+
+```{r}
+# get r^2
+result$aggregate(msr("regr.rsq"))
+
+# get MSE
+result$aggregate(msr("regr.mse"))
+
+# get MAE
+result$aggregate(msr("regr.mae"))
+```
+
+```{r}
+predictions = as.data.table(result$prediction())
+ggplot(predictions) +
+  geom_point(aes(x=truth, y=response)) +
+  ggtitle("xgboost Out of Sample Predictions")
+```
