@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(mlr3)
 library(mlr3learners)
 library(mlr3filters)
+library(mlr3pipelines)
 library(tidyverse)
 library(ggplot2)
 ```
@@ -19,11 +20,14 @@ library(ggplot2)
 
 ```{r}
 data_dir = "../datasets/"
-dataset_ul = read_csv(str_c(data_dir, "dataset_ul.csv"), col_types = cols(scenario=col_factor()))
+
+dataset_ul = read_csv(
+  str_c(data_dir, "dataset_ul.csv"), 
+  col_types = cols(scenario=col_factor())
+)
+
 dataset_ul_prediction = dataset_ul %>% select(
-  # TODO: encode scenario as described here:
-  # https://mlr3gallery.mlr-org.com/posts/2020-01-31-encode-factors-for-xgboost/
-  #scenario,
+  scenario,
   velocity_mps,
   acceleration_mpss,
   rsrp_dbm,
@@ -51,14 +55,17 @@ task
 ```
 
 ```{r}
-learner_xgboost = lrn("regr.xgboost", nrounds=10)
+factor_encoding = po("encode", method = "one-hot", affect_columns = selector_type("factor"))
+xgboost = lrn("regr.xgboost", nrounds=10)
+pipe = factor_encoding %>>% xgboost
+learner = GraphLearner$new(pipe)
 ```
 
 ```{r}
 resampling = rsmp("holdout", ratio = 0.8)
 result = resample(
   task = task, 
-  learner = learner_xgboost, 
+  learner = learner, 
   resampling = resampling
 )
 result
@@ -80,4 +87,31 @@ predictions = as.data.table(result$prediction())
 ggplot(predictions) +
   geom_point(aes(x=truth, y=response)) +
   ggtitle("xgboost Out of Sample Predictions")
+```
+
+## Feature Importance
+
+```{r}
+filter_permutation = flt("permutation",
+  learner = learner,
+  resampling = rsmp("holdout", ratio=0.8),
+  measure = msr("regr.mae"),
+  standardize = TRUE,
+  nmc=10
+)
+filter_permutation$calculate(task)
+```
+
+```{r}
+filter_permutation_results = as.data.table(filter_permutation)
+filter_permutation_results
+```
+
+```{r}
+ggplot(filter_permutation_results) +
+  geom_bar(aes(x = reorder(feature, -score), y = score), stat="identity") +
+  xlab("feature") +
+  ylab("MAE difference") +
+  scale_x_discrete(guide = guide_axis(angle = 20)) +
+  ggtitle("Permutation Feature Importance")
 ```
