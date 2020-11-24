@@ -71,14 +71,24 @@ task
 
 The next step is to create the prediction pipeline. It will consist of a factor encoding
 followed by the xgboost learner. The method for factor encoding is one-hot encoding.
+We put the pipeline creation inside of a function so that we can easily create
+untrained copies of the pipeline later when we need them.
 ```{r}
-factor_encoding = po("encode", method = "one-hot", affect_columns = selector_type("factor"))
-xgboost = lrn("regr.xgboost")
-pipe = factor_encoding %>>% xgboost
+make_pipeline = function() {
+  factor_encoding = po(
+    "encode",
+    method = "one-hot",
+    affect_columns = selector_type("factor")
+  )
+  xgboost = lrn("regr.xgboost")
+  pipe = factor_encoding %>>% xgboost
+  return(pipe)
+}
 ```
 
 Let's see what the pipeline looks like:
 ```{r}
+pipe = make_pipeline()
 pipe$plot(html=FALSE)
 ```
 
@@ -92,7 +102,7 @@ learner = GraphLearner$new(pipe)
 First, we have to define the set of parameters we use to tune the learner:
 ```{r}
 parameters = ParamSet$new(list(
-  ParamInt$new("regr.xgboost.nrounds", lower=10, upper=100),
+  ParamInt$new("regr.xgboost.nrounds", lower=10, upper=500),
   ParamDbl$new("regr.xgboost.gamma", lower=0, upper=10),
   ParamInt$new("regr.xgboost.max_depth", lower=1, upper=10),
   ParamDbl$new("regr.xgboost.min_child_weight", lower=1, upper=100)
@@ -120,13 +130,17 @@ tuned_learner = AutoTuner$new(
 
 ## Training the Learner
 
-```{r}
+```{r, results='hide'}
 result = resample(
   task = task, 
   learner = tuned_learner, 
   resampling = rsmp("cv", folds=5)
 )
-result
+```
+
+Check if everything went well:
+```{r}
+print(result)
 ```
 
 ## Prediction Results
@@ -151,9 +165,20 @@ ggplot(predictions) +
 
 ## Feature Importance
 
+Create an untrained learner with default parameters:
 ```{r}
+learner_default = GraphLearner$new(
+  make_pipeline()
+)
+learner_default$param_set$values = mlr3misc::insert_named(
+  learner_default$param_set$values,
+  list(regr.xgboost.nrounds=100)
+)
+```
+
+```{r, results='hide'}
 filter_permutation = flt("permutation",
-  learner = learner,
+  learner = learner_default,
   resampling = rsmp("holdout", ratio=0.8),
   measure = msr("regr.mae"),
   standardize = TRUE,
