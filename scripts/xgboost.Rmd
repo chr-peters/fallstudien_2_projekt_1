@@ -12,12 +12,23 @@ library(mlr3)
 library(mlr3learners)
 library(mlr3filters)
 library(mlr3pipelines)
+library(mlr3tuning)
+library(paradox)
 library(tidyverse)
 library(ggplot2)
+library(future)
+library(future.apply)
+```
+
+```{r}
+future::plan("multiprocess")
 ```
 
 # xgboost Upload Rate Prediction
 
+## Reading the Data
+
+First, the data has to be read from the .csv file:
 ```{r}
 data_dir = "../datasets/"
 
@@ -45,6 +56,8 @@ dataset_ul_prediction = dataset_ul_prediction %>% drop_na()
 glimpse(dataset_ul_prediction)
 ```
 
+Next, a prediction task has to be created to work with mlr3.
+The goal is to predict the variable `throughput_mbits`.
 ```{r}
 task = TaskRegr$new(
   id = "ul_prediction",
@@ -54,22 +67,69 @@ task = TaskRegr$new(
 task
 ```
 
+## Creating the Prediction Pipeline
+
+The next step is to create the prediction pipeline. It will consist of a factor encoding
+followed by the xgboost learner. The method for factor encoding is one-hot encoding.
 ```{r}
 factor_encoding = po("encode", method = "one-hot", affect_columns = selector_type("factor"))
-xgboost = lrn("regr.xgboost", nrounds=10)
+xgboost = lrn("regr.xgboost")
 pipe = factor_encoding %>>% xgboost
+```
+
+Let's see what the pipeline looks like:
+```{r}
+pipe$plot(html=FALSE)
+```
+
+Now the pipeline has to be converted to a learner so it can be used during training and prediction:
+```{r}
 learner = GraphLearner$new(pipe)
 ```
 
+## Parameter Tuning
+
+First, we have to define the set of parameters we use to tune the learner:
 ```{r}
-resampling = rsmp("holdout", ratio = 0.8)
+parameters = ParamSet$new(list(
+  ParamInt$new("regr.xgboost.nrounds", lower=10, upper=100),
+  ParamDbl$new("regr.xgboost.gamma", lower=0, upper=10),
+  ParamInt$new("regr.xgboost.max_depth", lower=1, upper=10),
+  ParamDbl$new("regr.xgboost.min_child_weight", lower=1, upper=100)
+))
+```
+
+Next, we specify the tuning algorithm. For now, we use grid search:
+```{r}
+tuner = tnr("grid_search", resolution=10)
+```
+
+Now all that is left is putting together the parts using the AutoTuner class.
+The resulting object is a learner that can automatically tune its parameters
+using the algorithm we specified.
+```{r}
+tuned_learner = AutoTuner$new(
+  learner = learner,
+  resampling = rsmp("cv", folds = 5),
+  measure = msr("regr.mae"),
+  search_space = parameters,
+  terminator = trm("evals", n_evals=100),
+  tuner = tuner
+)
+```
+
+## Training the Learner
+
+```{r}
 result = resample(
   task = task, 
-  learner = learner, 
-  resampling = resampling
+  learner = tuned_learner, 
+  resampling = rsmp("cv", folds=5)
 )
 result
 ```
+
+## Prediction Results
 
 ```{r}
 # get r^2
