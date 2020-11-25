@@ -13,14 +13,16 @@ library(mlr3learners)
 library(mlr3filters)
 library(mlr3pipelines)
 library(mlr3tuning)
+library(mlr3viz)
 library(paradox)
 library(tidyverse)
 library(ggplot2)
+library(patchwork)
 library(future)
 library(future.apply)
 ```
 
-```{r}
+```{r, warning=FALSE}
 future::plan("multiprocess")
 ```
 
@@ -128,52 +130,60 @@ tuned_learner = AutoTuner$new(
 )
 ```
 
-## Training the Learner
+## Training and Benchmarking
+
+Create a default learner to compare it to the tuned learner:
+```{r}
+make_default_learner = function() {
+  learner_default = GraphLearner$new(
+    make_pipeline()
+  )
+  learner_default$param_set$values = mlr3misc::insert_named(
+    learner_default$param_set$values,
+    list(regr.xgboost.nrounds=100)
+  )
+  return(learner_default)
+}
+default_learner = make_default_learner()
+```
+
+```{r}
+benchmark_design = benchmark_grid(
+  tasks = task,
+  learners = list(tuned_learner, default_learner),
+  resamplings = rsmp("cv", folds=5)
+)
+print(benchmark_design)
+```
 
 ```{r, results='hide'}
-result = resample(
-  task = task, 
-  learner = tuned_learner, 
-  resampling = rsmp("cv", folds=5)
-)
-```
-
-Check if everything went well:
-```{r}
-print(result)
-```
-
-## Prediction Results
-
-```{r}
-# get r^2
-result$aggregate(msr("regr.rsq"))
-
-# get MSE
-result$aggregate(msr("regr.mse"))
-
-# get MAE
-result$aggregate(msr("regr.mae"))
+benchmark_result = benchmark(benchmark_design)
+result_table = benchmark_result$aggregate(list(
+  msr("regr.mse"),
+  msr("regr.mae"),
+  msr("regr.rsq")
+))
 ```
 
 ```{r}
-predictions = as.data.table(result$prediction())
-ggplot(predictions) +
-  geom_point(aes(x=truth, y=response)) +
-  ggtitle("xgboost Out of Sample Predictions")
+knitr::kable(result_table[, c("learner_id", "regr.mse", "regr.mae", "regr.rsq")])
+```
+
+```{r}
+plot_mse = autoplot(benchmark_result, measure=msr("regr.mse")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+plot_mae = autoplot(benchmark_result, measure=msr("regr.mae")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+plot_rsq = autoplot(benchmark_result, measure=msr("regr.rsq")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+plot_mse + plot_mae + plot_rsq
 ```
 
 ## Feature Importance
 
 Create an untrained learner with default parameters:
 ```{r}
-learner_default = GraphLearner$new(
-  make_pipeline()
-)
-learner_default$param_set$values = mlr3misc::insert_named(
-  learner_default$param_set$values,
-  list(regr.xgboost.nrounds=100)
-)
+learner_default = make_default_learner()
 ```
 
 ```{r, results='hide'}
