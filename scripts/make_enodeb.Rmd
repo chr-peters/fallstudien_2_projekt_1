@@ -1,0 +1,65 @@
+---
+title: "Make eNodeB-ID"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE}
+library(tidyverse)
+```
+
+This function converts a cell-ID to an eNodeB-ID:
+```{r}
+cell_id_to_enodeb = function(cell_id) {
+  result = tryCatch(
+    {
+      hex_string = as.character(as.hexmode(cell_id))
+      enodeb_hex = str_sub(hex_string, start=1, end=-3)
+      enodeb_integer = as.integer(as.hexmode(enodeb_hex))
+      return(enodeb_integer)
+    },
+    error = function(err) {
+      return(NA)
+    }
+  )
+  return(result)
+}
+```
+
+Let's test it using the example from the slides (the correct eNodeB-ID is 50464):
+```{r}
+cell_id_to_enodeb(12918809)
+```
+
+A few more tests:
+```{r}
+print(cell_id_to_enodeb(13828122)==54016)
+print(cell_id_to_enodeb(26385408)==103068)
+print(cell_id_to_enodeb(13067274)==51044)
+print(is.na(cell_id_to_enodeb(NA)))
+print(is.na(cell_id_to_enodeb(0)))
+```
+
+Now it's time to add the eNodeB-ID to the datasets:
+```{r}
+# upload
+dataset_ul = read_csv("../datasets/dataset_ul.csv", col_types = cols(ci=col_integer()))
+dataset_ul_enodeb = dataset_ul %>% mutate(enodeb=map_int(ci, cell_id_to_enodeb))
+
+# download
+dataset_dl = read_csv("../datasets/dataset_dl.csv", col_types = cols(ci=col_integer()))
+dataset_dl_enodeb = dataset_dl %>% mutate(enodeb=map_int(ci, cell_id_to_enodeb))
+
+# context
+dataset_context = read_csv("../datasets/dataset_context.csv", col_types = cols(ci=col_integer()))
+dataset_context_enodeb = dataset_context %>% mutate(enodeb=map_int(ci, cell_id_to_enodeb))
+```
+
+```{r}
+write_csv(dataset_ul_enodeb, "../datasets/dataset_ul_enodeb.csv")
+write_csv(dataset_dl_enodeb, "../datasets/dataset_dl_enodeb.csv")
+write_csv(dataset_context_enodeb, "../datasets/dataset_context_enodeb.csv")
+```
