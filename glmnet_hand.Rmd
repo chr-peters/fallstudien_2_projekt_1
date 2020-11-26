@@ -11,9 +11,10 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r, message = FALSE}
+library(glmnet)
+library(clusterSim)
 setwd("~/fallstudien_2_projekt_1/datasets")
 data <- read.csv("dataset_ul.csv", header = TRUE, sep = ",")
-library(glmnet)
 ```
 
 ## Data
@@ -21,7 +22,7 @@ library(glmnet)
 read the table and select the covariates for the model
 ```{r}
 data <- subset(data, select = c(scenario, 
-                                provider, 
+                                provider,
                                 velocity_mps, 
                                 acceleration_mpss, 
                                 rsrp_dbm, 
@@ -43,7 +44,7 @@ seperate the full dataset in train and test data, hereby 75% of the data get to 
 
 ```{r}
 #set.seed(101) 
-sample <- sample.int(n = nrow(data), size = floor(.75*nrow(data)), replace = F)
+sample <- sample.int(n = nrow(data), size = floor(.80*nrow(data)), replace = F)
 train <- data[sample, ]
 test  <- data[-sample, ]
 ```
@@ -55,7 +56,12 @@ X <- makeX(train, test = test)
 
 train <- X[["x"]]
 test <- X[["xtest"]]
+```
 
+normalize the variables for feature importance
+```{r}
+scaled.train <- data.Normalization(train, type = "n12", normalization = "column")
+scaled.test <- data.Normalization(test, type = "n12", normalization = "column")
 ```
 
 ## Modelfitting
@@ -66,8 +72,8 @@ the parameter alpha for the elastic net model has to be set by user
 #fit <- glmnet(subset(train, select = -throughput_mbits), 
 #             subset(train, select = throughput_mbits))
 
-fit.cv <- cv.glmnet(subset(train, select = -throughput_mbits), 
-                    subset(train, select = throughput_mbits), 
+fit.cv <- cv.glmnet(subset(scaled.train, select = -throughput_mbits), 
+                    subset(scaled.train, select = throughput_mbits), 
                     type.measure = "mae", nfolds = 20, alpha = 1)
 ```
 
@@ -79,7 +85,7 @@ from the fitted cv.glmnet model we now generate the predictions with the covaria
 #pred <- predict.glmnet(object = fit, newx = subset(test, select = -throughput_mbits), 
 #                        s = 0, type = "response")
 
-pred.cv <- predict(object = fit.cv, newx = subset(test, select = -throughput_mbits), 
+pred.cv <- predict(object = fit.cv, newx = subset(scaled.test, select = -throughput_mbits), 
                    s = "lambda.min", type = "response")
 ```
 
@@ -91,24 +97,24 @@ plot the predictions from the cv glmnet model against the thruth values from our
 #plot(subset(test, select = throughput_mbits), pred, main = "GLMNET", 
 #              xlab = "truth", ylab = "prediction")
 
-plot(subset(test, select = throughput_mbits), pred.cv, main = "CV.GLMNET", 
+plot(subset(scaled.test, select = throughput_mbits), pred.cv, main = "CV.GLMNET", 
      xlab = "truth", ylab = "prediction")
 ```
 
 we want to know the modelrating, therefore we calculate the R-squared, MSE and MAE
 ```{r}
 #calculate R-Squared R^2
-yq <- mean(subset(test, select = throughput_mbits))
-R2 <- sum((pred.cv-yq)^2)/sum((subset(test, select = throughput_mbits)-yq)^2)
+yq <- mean(subset(scaled.test, select = throughput_mbits))
+R2 <- sum((pred.cv-yq)^2)/sum((subset(scaled.test, select = throughput_mbits)-yq)^2)
 R2
 
 #calculate MSE
 n <- 1/length(pred.cv)
-mse <- n*sum((subset(test, select = throughput_mbits)-pred.cv)^2)
+mse <- n*sum((subset(scaled.test, select = throughput_mbits)-pred.cv)^2)
 mse
 
 #calculate MAE
-mae <- n*sum(abs(subset(test, select = throughput_mbits)-pred.cv))
+mae <- n*sum(abs(subset(scaled.test, select = throughput_mbits)-pred.cv))
 mae
 ```
 
@@ -117,10 +123,13 @@ mae
 compare the absolute coefficients of the model, the larger the value the more information does the corresponding covariate brings
 
 ```{r}
-abs(coef(fit.cv))
+coef <- abs(coef(fit.cv))
+coef
 ```
 
-
+```{r}
+#imp <- coef[order(coef)]
+```
 
 
 
