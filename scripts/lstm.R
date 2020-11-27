@@ -1,15 +1,9 @@
 library(tidyverse)
 library(tibble)
-library(lubridate)
-library(recipes)
-library(hablar)
-library(timetk)
-library(rsample)
-library(tibbletime)
 library(keras)
-#library(mapfuser)
-library(anytime)
 library(abind)
+library(data.table)
+library(FRACTION)
 
 setwd("~/fallstudien_2_projekt_1/data_raw/campus")
 ul_filenames <- dir("~/fallstudien_2_projekt_1/data_raw/campus") %>% 
@@ -22,60 +16,104 @@ for (provider in providers){
     mutate(provider=provider) %>% rbind(ul_data) %>% na.omit()
 }
 
+# Scale data
+features <- c("throughput_mbits", "payload_mb")
+train_size <- 500 #ceiling(nrow(ul_data)*0.05)
+test_size <- 2 # floor(nrow(ul_data)*0.02)
 
-# create variable day to include different drives
-ul_data$day <- ul_data$timestamp_ms %>% anytime() %>% day
+# Divide data into test and train
+ul_train <- ul_data[1:train_size, features]
+ul_test <- ul_data[(train_size+1):(train_size+test_size), features]
+ul_train_scaled <- scale(ul_train)
+ul_test_scaled <- scale(ul_test, center = attr(ul_train_scaled, "scaled:center"), 
+                        scale = attr(ul_train_scaled, "scaled:scale"))
 
-ul_data_cropped <- ul_data[, c("throughput_mbits", "payload_mb", "")]
-ul_data_cropped[c("throughput_mbits", "payload_mb")] <- 
-  scale(ul_data_cropped[c("throughput_mbits", "payload_mb")])
-ul_data_cropped <- dummy_cols(ul_data_cropped)
-t_steps <- 7
-steps_out <- 2
+# include lag
+nlag <- 2
+ul_train_scaled <- cbind(
+  ul_train_scaled, 
+  "throughput_lag" = shift(ul_train_scaled[,"throughput_mbits"], nlag)
+  )
+ul_test_scaled <- cbind(
+  ul_test_scaled, 
+  "throughput_lag" = ul_train_scaled[-(1:(nrow(ul_train_scaled)-2)), "throughput_lag"]
+  )
 
-X <- array(dim=c(0,t_steps,ncol(ul_data_cropped)-1))
-y <- array(dim=c(0, 2))
-for (i in 1:(194+t_steps)){
-  end_in <- i+t_steps-1
-  end_out <- i+steps_out-1
-  if (end_out > (194+t_steps)) break
-  seq_x <- array(
-    ul_data_cropped[i:(end_in), 
-            names(ul_data_cropped) != "throughput_mbits" & names(ul_data_cropped) != "provider"], 
-    dim=c(1, t_steps, ncol(ul_data_cropped)-1))
-  seq_y <- array(ul_data_cropped[i:end_out, "throughput_mbits"], 
-                 dim=c(1, steps_out, 1))
-  X <- abind(X, seq_x, along = 1)
-  y <- abind(y, seq_y, along = 1)
+# drop nas
+ul_train_scaled <- na.omit(ul_train_scaled)
+
+# transform data into expected dimensions (r, c, h):
+# - rows: number of samples
+# - cols: timesteps (tsteps_in)
+# - height: number of features
+
+tsteps_in <- 2
+tsteps_out <- 2 # first tsteps_in-1 will not be predicted 
+                # -> nrow(testdata) >= (tsteps_in-1)+tsteps_out
+
+create_matrices <- function (data, tsteps_in, tsteps_out, y_col = "throughput_mbits", 
+                      n_features = ncol(data)-1){
+  
+  X <- array(dim = c(0, tsteps_in, n_features))
+  y <- array(dim = c(0, tsteps_out))
+  
+  for (i in 1:nrow(data)){
+    end_in <- i+tsteps_in-1
+    end_out <- end_in+(tsteps_out-1)
+    
+    seq_x <- array(
+      data[i:end_in, colnames(data) != y_col], 
+      dim = c(1, tsteps_in, n_features)
+    )
+    X <- abind(X, seq_x, along = 1)
+    
+    # end_out>=end_in -> no need to check end_in > nrow(data)
+    if (end_out > nrow(data)) break
+    
+    seq_y <- array(
+      data[((tsteps_in-1)+i):end_out, y_col], 
+      dim = c(1, tsteps_out)
+    )
+    y <- abind(y, seq_y, along = 1)
+  }
+  
+  return(list("X" = X, "y" = y))
 }
 
+train <- create_matrices(data = ul_train_scaled, tsteps_in = tsteps_in, 
+                         tsteps_out = tsteps_out)
+train$X <- train$X[1:nrow(train$y), , ]
+test <- create_matrices(data = ul_test_scaled, tsteps_in = tsteps_in, 
+                        tsteps_out = tsteps_out)
+
+nrow(train$X)
+nrow(test$X)
 
 # 5.1.6 LSTM Model
-batch_size = 2
-epochs = 50
+# batch size must be divisor of nrow(traindata) and nrow(testdata)
+batch_size = gcd(nrow(train$X), nrow(test$X))
+epochs = 100
 
 model <- keras_model_sequential()
 
 model %>%
-  layer_lstm(units            = 50, 
-             activation       = "relu", 
-             input_shape      = c(t_steps, dim(X)[3]),
+  layer_lstm(units            = 50,
+             input_shape      = c(tsteps_in, dim(train$X)[3]),
              batch_size       = batch_size,
              return_sequences = TRUE, 
              stateful         = TRUE) %>% 
-  layer_lstm(units            = 50, 
-             activation       = "relu",
+  layer_lstm(units            = 50,
              return_sequences = FALSE, 
              stateful         = TRUE) %>% 
-  layer_dense(units = 2)
+  layer_dense(units = tsteps_out)
 
 model %>% 
   compile(loss = 'mae', optimizer = 'adam')
 
 # 5.1.7 Fitting LSTM
 for (i in 1:epochs) {
-  model %>% fit(x          = X[1:198, , ], 
-                y          = y[1:198, ], 
+  model %>% fit(x          = train$X, 
+                y          = train$y, 
                 batch_size = batch_size,
                 epochs     = 1, 
                 verbose    = 1, 
@@ -88,11 +126,13 @@ for (i in 1:epochs) {
 
 # Make Predictions
 pred_out <- model %>% 
-  predict(X[181:200, , ], batch_size) #%>%
+  predict(test$X, batch_size) #%>%
   #.[,1] 
-pred_out
-y[181:200]
+pred_out[1,]
+ul_test_scaled[,"throughput_mbits"]
 
-ggplot(data.frame(actual=y[181:200], predict=pred_out), aes(x=actual, y=predict)) + 
-         geom_point()
+ggplot(
+  data = data.frame(actual=ul_test_scaled[, "throughput_mbits"], predict=pred_out[1,]), 
+  aes(x = actual, y = predict)
+  ) + geom_point()
 
