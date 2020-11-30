@@ -45,8 +45,8 @@ data <- data[complete.cases(data),]
 seperate the full dataset in train and test data, whereby 75% of the data get to be the training set and the rest will be the test set
 
 ```{r}
-#set.seed(101) 
-sample <- sample.int(n = nrow(data), size = floor(.75*nrow(data)), replace = F)
+set.seed(102) 
+sample <- sample.int(n = nrow(data), size = floor(.66*nrow(data)), replace = F)
 train <- data[sample, ]
 test  <- data[-sample, ]
 ```
@@ -162,6 +162,63 @@ in the coefficient plot it can easily be seen that the covariate "payload_mb" ha
 coefplot(fit.cv.scaled, sort = "magnitude")
 ```
 
+
+## Comparison provider und scenarios
+
+devide the test data in different provider "tmobile", "o2", "vodafone"
+
+```{r}
+x.test.d <- as.data.frame(x.test)
+
+y.test.tmobile <- y.test[which(x.test.d$providertmobile == 1)]
+pred.cv.tmobile <- pred.cv[which(x.test.d$providertmobile == 1)]
+
+y.test.o2 <- y.test[which(x.test.d$providertmobile == 0 & x.test.d$providervodafone == 0)]
+pred.cv.o2 <- pred.cv[which(x.test.d$providertmobile == 0 & x.test.d$providervodafone == 0)]
+
+y.test.vodafone <- y.test[which(x.test.d$providervodafone == 1)]
+pred.cv.vodafone <- pred.cv[which(x.test.d$providervodafone == 1)]
+```
+
+plot truth against prediction for the different provider, the red line symbolizes the perfect fit where truth equals prediction
+
+```{r}
+
+plot(y.test.tmobile, pred.cv.tmobile, main = "TMOBILE", xlab = "truth", ylab = "prediction")
+lines(y.test.tmobile, y.test.tmobile, col = "red")
+
+
+plot(y.test.o2, pred.cv.o2, main = "O2", xlab = "truth", ylab = "prediction")
+lines(y.test.tmobile, y.test.tmobile, col = "red")
+
+
+plot(y.test.vodafone, pred.cv.vodafone, main = "VODAFONE", xlab = "truth", ylab = "prediction")
+lines(y.test.tmobile, y.test.tmobile, col = "red")
+
+```
+
+calculate R-squared, MSE and MAE
+```{r}
+
+yq1 <- mean(y.test.tmobile)
+R2 <- sum((pred.cv.tmobile-yq1)^2)/sum((y.test.tmobile-yq1)^2)
+cat("R2 TMOBILE:", R2)
+cat("\n")
+
+yq2 <- mean(y.test.o2)
+R2 <- sum((pred.cv.o2-yq2)^2)/sum((y.test.o2-yq2)^2)
+cat("R2 O2:", R2)
+cat("\n")
+
+yq3 <- mean(y.test.vodafone)
+R2 <- sum((pred.cv.vodafone-yq3)^2)/sum((y.test.vodafone-yq3)^2)
+cat("R2 VODAFONE:", R2)
+cat("\n")
+
+```
+
+when we compare the different values of R-squared, one can see that the model fits best for provider "vodafone" and least for "tmobile"
+
 ## single models
 
 run the model with the following data
@@ -169,6 +226,7 @@ run the model with the following data
 #data <- data[data$provider == "vodafone",] R2 ~ 64
 #data <- data[data$provider == "o2",] R2 ~ 54
 #data <- data[data$provider == "tmobile",] R2 ~ 53
+
 ```
 
 
