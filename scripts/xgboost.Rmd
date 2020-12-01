@@ -236,6 +236,41 @@ results_by_scenario = tibble(
     get_measure(msr("regr.mae"), providers=providers, scenarios=s)
   })
 )
+
+results_by_scenario_and_provider = tibble()
+for (cur_provider in providers) {
+  for (cur_scenario in scenarios) {
+    cur_rsq = get_measure(msr("regr.rsq"), providers=cur_provider, scenarios=cur_scenario)
+    cur_mae = get_measure(msr("regr.mae"), providers=cur_provider, scenarios=cur_scenario)
+    cur_count = predictions_provider_scenario %>% 
+      filter(provider==cur_provider, scenario==cur_scenario) %>%
+      nrow()
+    results_by_scenario_and_provider = results_by_scenario_and_provider %>%
+      bind_rows(list(
+        "provider"=cur_provider, 
+        "scenario"=cur_scenario, 
+        "rsq"=cur_rsq, 
+        "mae"=cur_mae, 
+        "n"=cur_count
+      ))
+  }
+}
+```
+
+```{r}
+ggplot(results_by_scenario_and_provider, aes(x=provider, y=scenario)) +
+  geom_tile(aes(fill=rsq), colour="white") +
+  geom_text(aes(label=round(rsq, digits=2)), nudge_y=0.15, color="white") +
+  geom_text(aes(label=paste0("n=", n)), nudge_y=-0.15, color="white") +
+  ggtitle("R^2 by Provider and Scenario")
+```
+
+```{r}
+ggplot(results_by_scenario_and_provider, aes(x=provider, y=scenario)) +
+  geom_tile(aes(fill=mae), colour="white") +
+  geom_text(aes(label=round(mae, digits=2)), nudge_y=0.15, color="white") +
+  geom_text(aes(label=paste0("n=", n)), nudge_y=-0.15, color="white") +
+  ggtitle("MAE by Provider and Scenario")
 ```
 
 ```{r}
