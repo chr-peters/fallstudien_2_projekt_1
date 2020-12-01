@@ -6,6 +6,7 @@ library(data.table)
 library(FRACTION)
 library(Metrics)
 library(anytime)
+library(magrittr)
 
 setwd("~/fallstudien_2_projekt_1/data_raw/campus")
 ul_filenames <- dir("~/fallstudien_2_projekt_1/data_raw/campus") %>% 
@@ -19,29 +20,29 @@ for (provider in providers){
 }
 
 # Scale data
-features <- c("timestamp", "throughput_mbits", "payload_mb", "f_mhz", 
-              "rsrp_dbm", "rsrq_db", "pci", "ta", "id", "velocity_mps")
-
 ul_data$timestamp = anytime(ul_data$timestamp_ms)
 
-ggplot(data=ul_data[format(ul_data$timestamp, format = "%d") == 11, c("throughput_mbits", "timestamp")],
-       aes(x=timestamp, y=throughput_mbits)) + geom_point()
+features <- c("timestamp", "throughput_mbits", "payload_mb", "f_mhz", 
+              "rsrp_dbm", "rsrq_db", "pci", "ta", "id", "velocity_mps")
+numeric_features <- features[as.vector(unlist(lapply(ul_data[, features], is.numeric)))]
 
-train_size <- 600
-test_size <- 125
+ggplot(data=ul_data[format(ul_data$timestamp, format = "%d") == 11, c("throughput_mbits", "timestamp")],
+       aes(x=timestamp, y=throughput_mbits)) + geom_line()
+
+train_size <- 400
+test_size <- 325
 
 # Divide data into test and train
-ul_train <- ul_data[1:train_size, c("throughput_mbits", "payload_mb", "f_mhz", 
-                                    "rsrp_dbm", "rsrq_db", "pci", "ta", "id", "velocity_mps")]
-ul_test <- ul_data[(train_size+1):(train_size+test_size), c("throughput_mbits", "payload_mb", "f_mhz", 
-                                                            "rsrp_dbm", "rsrq_db", "pci", "ta", "id", "velocity_mps")]
-ul_train_scaled <- scale(ul_train)
-ul_test_scaled <- scale(ul_test, center = attr(ul_train_scaled, "scaled:center"), 
-                        scale = attr(ul_train_scaled, "scaled:scale"))
+ul_train <- ul_data[1:train_size, features]
+ul_test <- ul_data[(train_size+1):(train_size+test_size), features]
 
-# Save transformation
-center_history <- attr(ul_train_scaled, "scaled:center")
-scale_history <- attr(ul_train_scaled, "scaled:scale")
+center_history <- attr(scale(ul_train[numeric_features]), "scaled:center")
+scale_history <- attr(scale(ul_train[numeric_features]), "scaled:scale")
+
+ul_train_scaled[numeric_features] <- scale(ul_train[numeric_features]) # scale only num columns
+ul_test_scaled[numeric_features] <- scale(ul_test[numeric_features], center = center_history, 
+                        scale = scale_history)
+
 
 # include lag
 nlag <- 1 # nlag >= test_size
@@ -62,7 +63,7 @@ ul_train_scaled <- na.omit(ul_train_scaled)
 # - cols: timesteps (tsteps_in)
 # - height: number of features
 
-tsteps_in <- 7
+tsteps_in <- 6
 tsteps_out <- 1
 
 create_matrices <- function (data, tsteps_in, tsteps_out, y_col = "throughput_mbits", 
@@ -110,8 +111,10 @@ nrow(test$X)
 
 # 5.1.6 LSTM Model
 # batch size must be divisor of nrow(traindata) and nrow(testdata)
-batch_size = gcd(nrow(train$X), nrow(test$X))
+batch_size = gcd(nrow(train$X), nrow(predict$X))
 epochs = 100
+alpha = 2
+hidden_nodes = round(dim(train$X)[1] / (alpha * (tsteps_in + tsteps_out)))
 
 model <- keras_model_sequential()
 
@@ -172,5 +175,4 @@ ggplot(plot_data, aes(x=index, y=value, color=type)) + geom_line() + geom_vline(
   
 rmse(actual, pred_rescaled)
 mae(actual, pred_rescaled)
-
 
