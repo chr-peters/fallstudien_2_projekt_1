@@ -37,9 +37,10 @@ data_dir = "../datasets/"
 dataset_ul = read_csv(
   str_c(data_dir, "dataset_ul.csv"), 
   col_types = cols(scenario=col_factor())
-)
+) %>% rowid_to_column(var="row_id_original")
 
 dataset_ul_prediction = dataset_ul %>% select(
+  row_id_original,
   scenario,
   velocity_mps,
   acceleration_mpss,
@@ -66,6 +67,8 @@ task = TaskRegr$new(
   backend = dataset_ul_prediction,
   target = "throughput_mbits"
 )
+task$col_roles$name = "row_id_original"
+task$col_roles$feature = setdiff(task$col_roles$feature, "row_id_original")
 task
 ```
 
@@ -125,7 +128,7 @@ tuned_learner = AutoTuner$new(
   resampling = rsmp("cv", folds = 5),
   measure = msr("regr.mae"),
   search_space = parameters,
-  terminator = trm("evals", n_evals=100),
+  terminator = trm("evals", n_evals=10),
   tuner = tuner
 )
 ```
@@ -179,6 +182,86 @@ plot_rsq = autoplot(benchmark_result, measure=msr("regr.rsq")) +
 plot_mse + plot_mae + plot_rsq
 ```
 
+## Results
+
+```{r}
+predictions = as_tibble(as.data.table(result_table[[1, "resample_result"]]$prediction())) %>%
+  inner_join(as_tibble(task$row_names), by="row_id")
+predictions_provider_scenario = predictions %>% 
+  inner_join(dataset_ul, by=c("row_name"="row_id_original")) %>%
+  select(
+    row_id,
+    truth,
+    response,
+    provider,
+    scenario
+  )
+predictions_provider_scenario
+```
+
+```{r}
+get_measure = function(measure, providers, scenarios) {
+  subset = predictions_provider_scenario %>% 
+    filter(provider %in% providers, scenario %in% scenarios)
+  tmp_prediction = PredictionRegr$new(
+    row_ids = subset$row_id,
+    truth = subset$truth,
+    response = subset$response
+  )
+  result = measure$score(tmp_prediction)
+  return(result)
+}
+```
+
+```{r}
+providers = c("o2", "tmobile", "vodafone")
+scenarios = scenarios=c("campus", "suburban", "highway", "urban")
+
+results_by_provider = tibble(
+  provider = providers,
+  rsq = sapply(providers, function(p) {
+    get_measure(msr("regr.rsq"), providers=p, scenarios=scenarios)
+  }),
+  mae = sapply(providers, function(p) {
+    get_measure(msr("regr.mae"), providers=p, scenarios=scenarios)
+  })
+)
+
+results_by_scenario = tibble(
+  scenario = scenarios,
+  rsq = sapply(scenarios, function(s) {
+    get_measure(msr("regr.rsq"), providers=providers, scenarios=s)
+  }),
+  mae = sapply(scenarios, function(s) {
+    get_measure(msr("regr.mae"), providers=providers, scenarios=s)
+  })
+)
+```
+
+```{r}
+ggplot(results_by_provider) +
+  geom_bar(aes(x=provider, y=rsq), stat="identity") +
+  ggtitle("R^2 by provider")
+```
+
+```{r}
+ggplot(results_by_provider) +
+  geom_bar(aes(x=provider, y=mae), stat="identity") +
+  ggtitle("MAE by provider")
+```
+
+```{r}
+ggplot(results_by_scenario) +
+  geom_bar(aes(x=scenario, y=rsq), stat="identity") +
+  ggtitle("R^2 by scenario")
+```
+
+```{r}
+ggplot(results_by_scenario) +
+  geom_bar(aes(x=scenario, y=mae), stat="identity") +
+  ggtitle("MAE by scenario")
+```
+
 ## Feature Importance
 
 Create an untrained learner with default parameters:
@@ -195,10 +278,10 @@ filter_permutation = flt("permutation",
   nmc=10
 )
 filter_permutation$calculate(task)
+filter_permutation_results = as.data.table(filter_permutation)
 ```
 
 ```{r}
-filter_permutation_results = as.data.table(filter_permutation)
 filter_permutation_results
 ```
 
