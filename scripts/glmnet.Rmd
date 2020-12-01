@@ -15,6 +15,8 @@ library(glmnet)
 library(clusterSim)
 library(ggplot2)
 library(coefplot)
+#library(Metrics)
+library(matlab)
 
 setwd("~/GitHub/fallstudien_2_projekt_1/datasets")
 data <- read.csv("dataset_ul.csv", header = TRUE, sep = ",")
@@ -39,37 +41,48 @@ data <- subset(data, select = c(scenario,
 
 now eliminate the rows whith NA's init; "complete.cases" returns a logical vector indicating which cases are complete, i.e., have no missing values
 ```{r}
+
 data <- data[complete.cases(data),]
+
 ```
 
 seperate the full dataset in train and test data, whereby 75% of the data get to be the training set and the rest will be the test set
 
 ```{r}
+
 set.seed(102) 
 sample <- sample.int(n = nrow(data), size = floor(.66*nrow(data)), replace = F)
 train <- data[sample, ]
 test  <- data[-sample, ]
+
 ```
 
 in our case there are two variables that contain factors, therefore we have to endcode them, so that the model can handle them; one-hot ENCODING is used
 ```{r}
+
 X <- makeX(train, test = test)
 
 train <- X[["x"]]
 test <- X[["xtest"]]
 
-x.train <- subset(train, select = -throughput_mbits)
-y.train <- subset(train, select = throughput_mbits)
-
-x.test <- subset(test, select = -throughput_mbits)
-y.test <- subset(test, select = throughput_mbits)
 ```
 
 scale the variables for feature importance, whereby the test set has to be scaled with mean and standard deviation from train set
 ```{r}
+
 scaled.train <- scale(train)
 scaled.test <- scale(test, center = attr(scaled.train, "scaled:center"), 
                            scale = attr(scaled.train, "scaled:scale"))
+
+center <- attr(scaled.train, "scaled:center")
+scale <- attr(scaled.train, "scaled:scale")
+
+x.train <- subset(scaled.train, select = -throughput_mbits)
+y.train <- subset(scaled.train, select = throughput_mbits)
+
+x.test <- subset(scaled.test, select = -throughput_mbits)
+y.test <- subset(scaled.test, select = throughput_mbits)
+
 ```
 
 ## Hyperparameter Tuning
@@ -77,6 +90,7 @@ scaled.test <- scale(test, center = attr(scaled.train, "scaled:center"),
 while the parameter lambda ist determined via cross validation, the best choice for alpha has to be detected by the user himself; "a" is the number of values of alphas that are examined and "alpha.opt" is the optimal value of the input alphas ("alpha.opt" = 0 LASSO, "alpha.opt" = 1 RIDGE regression)  
 
 ```{r}
+
 a <- 20
 
 fits <- list()
@@ -98,6 +112,7 @@ for (i in 0:a){
 
 alpha.opt <- results$alpha[results$mse == min(results$mse)]
 cat("optimal alpha:", alpha.opt)
+
 ```
 
 ## Modelfitting
@@ -105,11 +120,9 @@ cat("optimal alpha:", alpha.opt)
 fit the glmnet model with cross validation for the penalty parameter lambda
 the parameter alpha for the elastic net model has to be set by user
 ```{r}
-fit.cv.scaled <- cv.glmnet(subset(scaled.train, select = -throughput_mbits), 
-                    subset(scaled.train, select = throughput_mbits), 
-                    type.measure = "mse", nfolds = 30, alpha = alpha.opt)
 
 fit.cv <- cv.glmnet(x.train, y.train, type.measure = "mse", nfolds = 30, alpha = alpha.opt)
+
 ```
 
 
@@ -117,15 +130,23 @@ fit.cv <- cv.glmnet(x.train, y.train, type.measure = "mse", nfolds = 30, alpha =
 
 from the fitted cv.glmnet model we now generate the predictions with the covariates from the test set, we hereby use the penalty parameter lambda that generates the lowest error in de cv process
 ```{r}
+
 pred.cv <- predict(object = fit.cv, newx = x.test, s = "lambda.min", type = "response")
+
 ```
 
 ## Results
 
 plot the predictions from the cv glmnet model against the thruth values from our test set
+
 ```{r}
+
+y.test <- y.test*scale["throughput_mbits"] + center["throughput_mbits"]
+pred.cv <- pred.cv*scale["throughput_mbits"] + center["throughput_mbits"]
+
 plot(y.test, pred.cv, main = "CV.GLMNET", xlab = "truth", ylab = "prediction")
 lines(y.test, y.test, col = "red")
+
 ```
 
 we want to know the modelrating, therefore we calculate the R-squared, MSE and MAE
@@ -145,6 +166,8 @@ cat("\n")
 
 mae <- n*sum(abs(y.test-pred.cv))
 cat("MAE", mae)
+
+#rmse(y.test, pred.cv)
 ```
 
 ## Feature Importance 
@@ -152,23 +175,35 @@ cat("MAE", mae)
 compare the absolute coefficients of the model, the larger the value the more information does the corresponding covariate brings
 
 ```{r}
-coef <- abs(coef(fit.cv.scaled))
+coef <- abs(coef(fit.cv))
 coef
 ```
 
 in the coefficient plot it can easily be seen that the covariate "payload_mb" has the most influence on the "throughput_mbits" response
 ```{r}
 #coef[order(coef)]
-coefplot(fit.cv.scaled, sort = "magnitude")
+coefplot(fit.cv, sort = "magnitude")
 ```
 
 
 ## Comparison provider und scenarios
 
-devide the test data in different provider "tmobile", "o2", "vodafone"
+rescale some of the data
 
 ```{r}
 x.test.d <- as.data.frame(x.test)
+
+x.test.d$providertmobile <- x.test.d$providertmobile*scale["providertmobile"] + center["providertmobile"]
+x.test.d$providervodafone <- x.test.d$providervodafone*scale["providervodafone"] + center["providervodafone"]
+
+x.test.d$scenariocampus <- x.test.d$scenariocampus*scale["scenariocampus"] + center["scenariocampus"]
+x.test.d$scenariourban <- x.test.d$scenariourban*scale["scenariourban"] + center["scenariourban"]
+x.test.d$scenariosuburban <- x.test.d$scenariosuburban*scale["scenariosuburban"] + center["scenariosuburban"]
+x.test.d$scenariohighway <- x.test.d$scenariohighway*scale["scenariohighway"] + center["scenariohighway"]
+```
+
+devide the test data in different provider "tmobile", "o2", "vodafone"
+```{r}
 
 y.test.tmobile <- y.test[which(x.test.d$providertmobile == 1)]
 pred.cv.tmobile <- pred.cv[which(x.test.d$providertmobile == 1)]
@@ -178,6 +213,13 @@ pred.cv.o2 <- pred.cv[which(x.test.d$providertmobile == 0 & x.test.d$providervod
 
 y.test.vodafone <- y.test[which(x.test.d$providervodafone == 1)]
 pred.cv.vodafone <- pred.cv[which(x.test.d$providervodafone == 1)]
+
+```
+
+and the different scenarios "campus", "urban", "suburban", "highway"
+
+```{r}
+
 ```
 
 plot truth against prediction for the different provider, the red line symbolizes the perfect fit where truth equals prediction
