@@ -148,6 +148,47 @@ dataset_context = dataset_context %>% mutate(enodeb=map_int(ci, cell_id_to_enode
 dataset_cells = dataset_cells %>% mutate(enodeb=map_int(ci, cell_id_to_enodeb))
 ```
 
+# Add an ID for each drive
+
+```{r}
+# this function assumes that the data is sorted by timestamp in ascending order
+get_drive_ids = function(data, max_time_delta = minutes(10)) {
+  
+  num_rows = nrow(data)
+  drive_ids = integer(num_rows)
+  
+  last_timestamp = as_datetime(origin) # the earliest possible date
+  cur_drive_id = 0
+  
+  for(cur_row in seq_len(num_rows)) {
+    
+    cur_timestamp = data[[cur_row, "timestamp"]]
+    
+    if (cur_timestamp - last_timestamp > max_time_delta) {
+      cur_drive_id = cur_drive_id + 1
+    }
+    last_timestamp = cur_timestamp
+    
+    drive_ids[cur_row] = cur_drive_id
+  }
+  
+  return(drive_ids)
+}
+```
+
+```{r}
+dataset_ul = add_column(dataset_ul, drive_id = factor(get_drive_ids(dataset_ul)))
+dataset_dl = add_column(dataset_dl, drive_id = factor(get_drive_ids(dataset_dl)))
+dataset_context = add_column(dataset_context, drive_id = factor(get_drive_ids(dataset_context)))
+dataset_cells = add_column(dataset_cells, drive_id = factor(get_drive_ids(dataset_cells)))
+```
+
+```{r}
+ggplot(dataset_ul, aes(x=timestamp, y=throughput_mbits)) +
+  geom_line(aes(color=drive_id)) +
+  geom_point(aes(color=drive_id))
+```
+
 Store them:
 ```{r}
 write_csv(dataset_ul, str_c(data_destination_dir, "dataset_ul.csv"))
