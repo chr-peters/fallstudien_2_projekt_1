@@ -1,0 +1,53 @@
+\documentclass[10pt]{beamer}
+
+\usetheme{metropolis}
+\usepackage{appendixnumberbeamer}
+
+\usepackage{ucs}
+\usepackage[utf8x]{inputenc}
+
+\usepackage{booktabs}
+\usepackage[scale=2]{ccicons}
+
+\usepackage{pgfplots}
+\usepgfplotslibrary{dateplot}
+
+\usepackage{xspace}
+\newcommand{\themename}{\textbf{\textsc{metropolis}}\xspace}
+
+\title{Fallstudien II}
+%\subtitle{A modern beamer theme}
+\date{12. Dezember 2020}
+\author{Laura Kampmann, Christian Peters, Alina Stammen}
+\institute{TU Dortmund}
+%\titlegraphic{\hfill\includegraphics[height=1.5cm]{logo.pdf}}
+
+\begin{document}
+
+\maketitle
+
+\begin{frame}{Inhalt}
+  \setbeamertemplate{section in toc}[sections numbered]
+  \tableofcontents[hideallsubsections]
+\end{frame}
+
+\input{abschnitte/einleitung}
+
+\input{abschnitte/arima}
+
+\begin{frame}[standout]
+  Irgendwas zum Schluss
+\end{frame}
+
+\appendix
+
+\begin{frame}[allowframebreaks]{Literatur}
+
+  \nocite{knuth92,ConcreteMath,Simpson,Er01,greenwade93}
+
+  \bibliography{literatur}
+  \bibliographystyle{abbrv}
+
+\end{frame}
+
+\end{document}
