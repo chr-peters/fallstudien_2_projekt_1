@@ -16,7 +16,6 @@ library(anytime)
 library(matlab)
 library(readr)
 library(stringr)
-
 ```
 
 Define where to get the data from and where to put the resulting data sets:
@@ -48,6 +47,17 @@ get_datatype_by_filename = function(filename) {
 get_datatype_by_filename("1544519617_vodafone_ul.txt")
 ```
 
+```{r}
+get_start_time_by_filename = function(filename) {
+  split_result = str_split(filename, "_")
+  result = as_datetime(as.integer(split_result[[1]][[1]]))
+  return(result)
+}
+
+# example:
+get_start_time_by_filename("1544519617_vodafone_ul.txt")
+```
+
 This function creates a dataset for a given `datatype` like "ul", "dl", "context" or cells.
 The provider is added as an extra column as well as the scenario.
 ```{r}
@@ -74,18 +84,19 @@ make_dataset = function(data_location, datatype) {
       
       # read the file and add a column for the provider and for the scenario
       cur_provider = get_provider_by_filename(cur_filename)
+      cur_start_time = get_start_time_by_filename(cur_filename)
       cur_dataset = read_csv(str_c(cur_path, "/", cur_filename), col_type=cols()) %>%
-        mutate(scenario=cur_scenario, provider=cur_provider)
+        mutate(scenario=cur_scenario, provider=cur_provider, start_time=cur_start_time)
       
       # attach it to the list
       datasets[[length(datasets)+1]] = cur_dataset
     }
   }
   
-  # build the final dataset, convert the seconds to proper dates and sort by time
+  # build the final dataset and convert the seconds to proper dates
   final_dataset = bind_rows(datasets) %>% 
-    mutate(timestamp=as_datetime(timestamp_ms)) %>% 
-    arrange(timestamp)
+    mutate(timestamp=as_datetime(timestamp_ms)) %>%
+    arrange(start_time)
   return(final_dataset)
 }
 ```
@@ -156,25 +167,34 @@ dataset_cells = dataset_cells %>% mutate(enodeb=map_int(ci, cell_id_to_enodeb))
 # Add an ID for each drive
 
 ```{r}
-# this function assumes that the data is sorted by timestamp in ascending order
-get_drive_ids = function(data, max_time_delta = minutes(10)) {
+get_drive_ids = function(data) {
   
   num_rows = nrow(data)
   drive_ids = integer(num_rows)
   
-  last_timestamp = as_datetime(origin) # the earliest possible date
-  cur_drive_id = 0
+  last_start_time_by_scenario = character(4)
+  names(last_start_time_by_scenario) = c("urban", "suburban", "campus", "highway")
+  
+  last_drive_id_by_scenario = integer(4)
+  names(last_drive_id_by_scenario) =c("urban", "suburban", "campus", "highway")
   
   for(cur_row in seq_len(num_rows)) {
     
-    cur_timestamp = data[[cur_row, "timestamp"]]
+    cur_scenario = data[[cur_row, "scenario"]]
+    cur_start_time = as.character(data[[cur_row, "start_time"]])
     
-    if (cur_timestamp - last_timestamp > max_time_delta) {
-      cur_drive_id = cur_drive_id + 1
+    last_start_time = last_start_time_by_scenario[cur_scenario]
+    last_drive_id = last_drive_id_by_scenario[cur_scenario]
+    
+    if (cur_start_time != last_start_time) {
+      cur_drive_id = last_drive_id + 1
+      drive_ids[cur_row] = cur_drive_id
+      last_start_time_by_scenario[cur_scenario] = cur_start_time
+      last_drive_id_by_scenario[cur_scenario] = cur_drive_id
+      next()
     }
-    last_timestamp = cur_timestamp
     
-    drive_ids[cur_row] = cur_drive_id
+    drive_ids[cur_row] = last_drive_id
   }
   
   return(drive_ids)
@@ -182,88 +202,163 @@ get_drive_ids = function(data, max_time_delta = minutes(10)) {
 ```
 
 ```{r}
-dataset_ul = add_column(dataset_ul, drive_id = factor(get_drive_ids(dataset_ul)))
-dataset_dl = add_column(dataset_dl, drive_id = factor(get_drive_ids(dataset_dl)))
-dataset_context = add_column(dataset_context, drive_id = factor(get_drive_ids(dataset_context)))
-dataset_cells = add_column(dataset_cells, drive_id = factor(get_drive_ids(dataset_cells)))
+add_drive_ids = function(dataset) {
+  
+  dataset = arrange(dataset, start_time)
+  
+  dataset_o2 = filter(dataset, provider=="o2")
+  dataset_tmobile = filter(dataset, provider=="tmobile")
+  dataset_vodafone = filter(dataset, provider=="vodafone")
+  
+  result = bind_rows(
+    add_column(dataset_o2, drive_id = factor(get_drive_ids(dataset_o2))),
+    add_column(dataset_tmobile, drive_id = factor(get_drive_ids(dataset_tmobile))),
+    add_column(dataset_vodafone, drive_id = factor(get_drive_ids(dataset_vodafone)))
+  )
+  
+  return(result)
+}
 ```
 
 ```{r}
-ggplot(dataset_ul, aes(x=timestamp, y=throughput_mbits)) +
-  geom_line(aes(color=drive_id)) +
-  geom_point(aes(color=drive_id))
+dataset_ul = add_drive_ids(dataset_ul)
+dataset_dl = add_drive_ids(dataset_dl)
+dataset_context = add_drive_ids(dataset_context)
+dataset_cells = add_drive_ids(dataset_cells)
 ```
 
-Store them:
+```{r}
+ggplot(
+  filter(dataset_ul, timestamp<=ymd(20181211), provider=="tmobile", scenario=="campus"),
+  aes(x=timestamp, y=throughput_mbits)
+) + geom_point(aes(color=drive_id)) +
+  geom_line(aes(color=drive_id)) +
+  ggtitle("First three campus drives for tmobile (dataset_ul)")
+```
+
+```{r}
+ggplot(
+  filter(dataset_context, timestamp<=ymd(20181211), provider=="tmobile", scenario=="campus"),
+  aes(x=timestamp, y=rsrp_dbm)
+) + geom_point(aes(color=drive_id)) +
+  geom_line(aes(color=drive_id)) +
+  ggtitle("First three campus drives for tmobile (dataset_context)")
+```
+
+# Add Neighboring RSRP and RSRQ in Context File
+
+```{r}
+add_neighbor_info = function(dataset_context, dataset_cells) {
+  
+  dataset_context <- dataset_context %>% drop_na() %>% arrange(timestamp)
+  dataset_cells <- filter(dataset_cells, rsrp_dbm!=0)
+  
+  # füge zusätzliche Spalte mit erstmal nur Nullen in context, wo dann am Ende die errechneten
+  # RSRP der Nachbarzellen eingefügt werden sollen 
+  dataset_context$rsrp_neighbor <- 0
+  dataset_context$rsrq_neighbor <- 0
+  
+  for (p in c("o2", "tmobile", "vodafone")){
+    
+    dataset_context_p = filter(dataset_context, provider==p)
+  	dataset_cells_p <- filter(dataset_cells, provider==p)
+  
+  	for (s in unique(dataset_context_p$scenario)){
+  	  
+      dataset_context_ps <- filter(dataset_context_p, scenario==s)
+  		dataset_cells_ps <- filter(dataset_cells_p, scenario==s)
+      		
+  		for (d in unique(dataset_context_ps$drive_id)){
+  		  
+        dataset_context_psd <- filter(dataset_context_ps, drive_id==d)
+  			dataset_cells_psd <- filter(dataset_cells_ps, drive_id==d)
+  			
+        for (i in 1:dim(dataset_context_psd)[1]){
+          
+  				if (any(dataset_cells_psd$timestamp == dataset_context_psd$timestamp[i])){
+  					neighbor <- dataset_cells_psd[which(dataset_cells_psd$timestamp == dataset_context_psd$timestamp[i]),]
+  	  			max_rsrp <- max(neighbor$rsrp_dbm)
+  	  			dataset_context_psd$rsrp_neighbor[i] <- max_rsrp
+  
+  					neighbor <- dataset_cells_psd[which(dataset_cells_psd$timestamp == dataset_context_psd$timestamp[i]),]
+  	  			max_rsrq <- max(neighbor$rsrq_db)
+  	  			dataset_context_psd$rsrq_neighbor[i] <- max_rsrq
+  				}
+  				else {
+  					if (any(dataset_cells_psd$timestamp < dataset_context_psd$timestamp[i])){
+  						dataset_context_psd$rsrp_neighbor[i] <- dataset_context_psd$rsrp_neighbor[i-1]
+  						dataset_context_psd$rsrq_neighbor[i] <- dataset_context_psd$rsrq_neighbor[i-1]
+  					}
+  					else {
+  						dataset_context_psd$rsrp_neighbor[i] <- -Inf		
+  						dataset_context_psd$rsrq_neighbor[i] <- -Inf
+  					}
+  				}		
+        }
+  			
+  			dataset_context[
+  			  (dataset_context$provider == p & dataset_context$scenario == s & dataset_context$drive_id == d),
+  			] <- dataset_context_psd
+  		}
+  	}
+  }
+  
+  return(dataset_context)
+}
+```
+
+```{r}
+dataset_context = add_neighbor_info(dataset_context, dataset_cells)
+```
+
+# Add Link Lifetime to Context File
+
+```{r}
+add_link_lifetime = function(dataset_context) {
+  dataset_context <- dataset_context %>% drop_na() %>% arrange(timestamp)
+  dataset_context$link_lifetime <- -1
+  
+  
+  for (p in c("o2", "tmobile", "vodafone")){
+    dataset_context_p = filter(dataset_context, provider==p)
+  
+    for (s in unique(dataset_context_p$scenario)){
+      dataset_context_ps = filter(dataset_context_p, scenario==s)
+      
+      for (d in unique(dataset_context_ps$drive_id)){
+        dataset_context_psd = filter(dataset_context_ps, drive_id==d)
+  
+        for (j in 1:dim(dataset_context_psd)[1]){
+          diff_bildungs_ts = dataset_context_psd$time_s[dim(dataset_context_psd)[1]]
+          for (i in min(j+1, dim(dataset_context_psd)[1]):dim(dataset_context_psd)[1]){
+            if (dataset_context_psd$enodeb[i] != dataset_context_psd$enodeb[j]){
+              diff_bildungs_ts <- dataset_context_psd$time_s[i]
+              break
+            }
+          }
+          
+          dataset_context_psd$link_lifetime[j] <- diff_bildungs_ts - dataset_context_psd$time_s[j]
+        }
+  
+        dataset_context[
+          (dataset_context$provider == p & dataset_context$scenario == s & dataset_context$drive_id == d),
+        ] <- dataset_context_psd
+      }
+    }
+  }
+  return(dataset_context)
+}
+```
+
+```{r}
+dataset_context = add_link_lifetime(dataset_context)
+```
+
+# Store the data
+
 ```{r}
 write_csv(dataset_ul, str_c(data_destination_dir, "dataset_ul.csv"))
 write_csv(dataset_dl, str_c(data_destination_dir, "dataset_dl.csv"))
 write_csv(dataset_context, str_c(data_destination_dir, "dataset_context.csv"))
 write_csv(dataset_cells, str_c(data_destination_dir, "dataset_cells.csv"))
-```
-
-# Ad dwell time in eNodeB
-
-data
-
-```{r}
-
-setwd("~/GitHub/fallstudien_2_projekt_1/datasets")
-data_destination_dir <- "~/GitHub/fallstudien_2_projekt_1/datasets/"
-
-dataset_context <- read.csv("dataset_context.csv", header = TRUE, sep = ",")
-#data_cells <- read.csv("dataset_cells.csv", header = TRUE, sep = ",")
-
-dataset_context <- dataset_context[complete.cases(dataset_context),]
-
-dataset_context$dwell_time <- ones(dim(dataset_context)[1], 1)
-
-```
-
-
-calculate dwell time for provider
-
-```{r}
-
-for (p in c("o2", "tmobile", "vodafone")){
-  data_context_p <- dataset_context[which(dataset_context$provider == p),]
-  data_context_p$dwell_time <- ones(dim(data_context_p)[1], 1)
-  for (j in 1:(dim(data_context_p)[1]-1)){
-    enodeb <- data_context_p$enodeb[j]
-    for (i in j+1:dim(data_context_p)[1]){
-      if (data_context_p$drive_id[i] != data_context_p$drive_id[i-1] |
-          data_context_p$enodeb[i] != enodeb){
-        data_context_p$dwell_time[j] <- difftime(anytime(data_context_p$timestamp[i-1]),
-          anytime(data_context_p$timestamp[j]), units = "secs")
-        break
-      }
-      else if (i == dim(data_context_p)[1]){
-        data_context_p$dwell_time[j] <- difftime(anytime(data_context_p$timestamp[i]),
-          anytime(data_context_p$timestamp[j]), units = "secs")
-        break
-      }
-    }
-  }
-  data_context_p$dwell_time[dim(data_context_p)[1]] <- difftime(
-    anytime(data_context_p$timestamp[dim(data_context_p)[1]]),
-    anytime(data_context_p$timestamp[dim(data_context_p)[1]]), units = "secs")
-  
-  dataset_context[dataset_context$provider == p,] <- data_context_p
-}
-
-
-```
-
-
-```{r}
-
-head(dataset_context)
-
-```
-
-```{r}
-
-write_csv(dataset_context, str_c(data_destination_dir, "dataset_context.csv"))
-
-
 ```
