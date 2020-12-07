@@ -1,0 +1,137 @@
+---
+title: "xgboost Link Lifetime Prediction"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(mlr3)
+library(mlr3learners)
+library(mlr3pipelines)
+
+library(tidyverse)
+```
+
+# Reading the Data
+
+```{r}
+data_dir = "../datasets/"
+
+dataset_context = read_csv(
+  str_c(data_dir, "dataset_context.csv"), 
+  col_types = cols(scenario=col_factor(), provider=col_factor())
+) %>% rowid_to_column(var="row_id_original")
+
+dataset_context_prediction = dataset_context %>% select(
+  row_id_original,
+  drive_id,
+  provider,
+  scenario,
+  velocity_mps,
+  acceleration_mpss,
+  rsrp_dbm,
+  rsrq_db,
+  rssnr_db,
+  cqi,
+  ta,
+  rsrp_neighbor,
+  rsrq_neighbor,
+  link_lifetime
+)
+
+# remove missing values
+dataset_context_prediction = drop_na(dataset_context_prediction)
+glimpse(dataset_context_prediction)
+```
+
+# Train and Validation Split
+
+```{r}
+dataset_context_train = dataset_context_prediction %>% 
+  filter(drive_id %in% 1:8) %>% 
+  select(!drive_id)
+
+dataset_context_validation = dataset_context_prediction %>% 
+  filter(drive_id %in% 9:10) %>% 
+  select(!drive_id)
+
+task_train = TaskRegr$new(
+  id = "link_lifetime_train",
+  backend = dataset_context_train,
+  target = "link_lifetime"
+)
+task_train$col_roles$name = c("row_id_original")
+task_train$col_roles$feature = setdiff(
+  task_train$col_roles$feature,
+  "row_id_original"
+)
+task_train
+
+task_validation = TaskRegr$new(
+  id = "link_lifetime_test",
+  backend = dataset_context_validation,
+  target = "link_lifetime"
+)
+task_validation$col_roles$name = c("row_id_original")
+task_validation$col_roles$feature = setdiff(
+  task_validation$col_roles$feature, 
+  "row_id_original"
+)
+task_validation
+```
+
+# Pipeline Creation
+
+```{r}
+make_pipeline = function() {
+  factor_encoding = po(
+    "encode",
+    method = "one-hot",
+    affect_columns = selector_type("factor")
+  )
+  xgboost = lrn("regr.xgboost")
+  pipe = factor_encoding %>>% xgboost
+  return(pipe)
+}
+```
+
+```{r}
+make_default_learner = function() {
+  learner_default = GraphLearner$new(
+    make_pipeline()
+  )
+  learner_default$param_set$values = mlr3misc::insert_named(
+    learner_default$param_set$values,
+    list(regr.xgboost.nrounds=100)
+  )
+  return(learner_default)
+}
+default_learner = make_default_learner()
+```
+
+# Training the Learner
+
+```{r}
+default_learner$train(task_train)
+```
+
+# Results on Validation Data
+
+```{r}
+prediction = default_learner$predict(task_validation)
+```
+
+```{r}
+prediction$score(msr("regr.rsq"))
+prediction$score(msr("regr.mae"))
+prediction$score(msr("regr.rmse"))
+```
+
+```{r}
+prediction_results = as.data.table(prediction)
+ggplot(prediction_results, aes(x=truth, y=response)) +
+  geom_point()
+```
