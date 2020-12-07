@@ -1,3 +1,4 @@
+source("C:/Users/Laura/Documents/GitHub/fallstudien_2_projekt_1/scripts/arima_helpers.R")
 library(forecast)
 library(fastDummies)
 library(dplyr)
@@ -5,97 +6,118 @@ library(anytime)
 library(ggplot2)
 library(Metrics)
 library(corrplot)
+library(grid)
+library(ggcorrplot)
 
+setwd("~/GitHub/fallstudien_2_projekt_1/datasets")
+ul_data <- read.csv2("dataset_ul.csv", header=TRUE, sep=",", dec=".")
 
-setwd("~/fallstudien_2_projekt_1/data_raw/campus")
-ul_filenames <- dir("~/fallstudien_2_projekt_1/data_raw/campus") %>% 
-  grep("ul", ., value=TRUE) 
-providers <- c("o2", "vodafone", "tmobile")
-ul_data <- data.frame()
-for (provider in providers){
-  ul_data <- ul_filenames %>% grep(provider, ., value=TRUE) %>%
-    lapply(read.csv2, header=TRUE, sep=",", dec=".") %>% do.call(rbind, .) %>% 
-    mutate(provider=provider) %>% rbind(ul_data) %>% na.omit()
+# Divide data by provider
+vodafone <- ul_data[ul_data$provider == "vodafone", ]
+vodafone$provider <- "Vodafone"
+tmobile <- ul_data[ul_data$provider == "tmobile", ]
+tmobile$provider <- "T-Mobile"
+o2 <- ul_data[ul_data$provider == "o2", ]
+o2$provider <- "O2"
+providers <- list("vodafone" = vodafone, "tmobile" = tmobile, "o2" = o2)
+
+# add timestamp and index
+for (i in 1:length(providers)){
+  providers[[i]]$timestamp <- providers[[i]]$timestamp_ms %>% anytime()
+  providers[[i]]$index <- 1:nrow(providers[[i]])
 }
 
-# Sort Data
-ul_data <- ul_data[order(ul_data$timestamp), ]
-
-# Data
-ul_data$timestamp <- ul_data$timestamp_ms %>% anytime()
-ul_data$index <- 1:nrow(ul_data)
-
-# Sort Data
-ul_data <- ul_data[order(ul_data$timestamp), ]
+# Sort Data by timestamp
+providers <- lapply(providers, function(provider) provider[order(provider$timestamp), ])
 
 # Graphs
-ggplot(
-  ul_data[, c("timestamp", "throughput_mbits")], 
-  aes(x=timestamp, y=throughput_mbits)
-  ) + 
-  geom_line()
+# Throughput
+lapply(providers, function(provider) 
+  ggplot(provider, 
+         aes(x=timestamp, y=throughput_mbits)
+         ) + 
+    geom_line()  + 
+    facet_wrap(~scenario) +
+    ggtitle(unique(provider$provider))
+  )
 
-ggplot(
-  ul_data[, c("index", "throughput_mbits")], 
-  aes(x=index, y=throughput_mbits)
-) + 
-  geom_line()
+lapply(providers, function(provider) 
+  ggplot(provider, 
+         aes(x=index, y=throughput_mbits)
+         ) + 
+    geom_line()  + 
+    facet_wrap(~scenario) + 
+    ggtitle(unique(provider$provider))
+)
 
+# Acf und pAcf
+throughputs <- list(vodafone = providers$vodafone$throughput_mbits, 
+                    tmobile = providers$tmobile$throughput_mbits, 
+                    o2 = providers$o2$throughput_mbits)
+plot_acf(throughputs, type="acf")
+plot_acf(throughputs, type="pacf")
 
-acf(ul_data$throughput_mbits)
-pacf(ul_data$throughput_mbits)
+# Cross Correlation
+features <- c("throughput_mbits", "payload_mb", "f_mhz", 
+              "rsrp_dbm", "rsrq_db", "ta", "velocity_mps")
+lapply(providers, function(provider) plot_ccf(provider[[1]], features, lag.max = 10))
 
 # Select features
-ul_data$day <- ul_data$timestamp_ms %>% anytime() %>% format("%d") %>% as.integer()
-ul_data$hour <- ul_data$timestamp_ms %>% anytime() %>% format("%H") %>% as.integer()
+#ul_data$day <- ul_data$timestamp_ms %>% anytime() %>% format("%d") %>% as.integer()
+#ul_data$hour <- ul_data$timestamp_ms %>% anytime() %>% format("%H") %>% as.integer()
 
 features <- c("throughput_mbits", "payload_mb", "f_mhz", 
-              "rsrp_dbm", "rsrq_db", "ta")
-numeric_features <- features[as.vector(unlist(lapply(ul_data[, features], is.numeric)))]
+              "rsrp_dbm", "rsrq_db", "ta", "velocity_mps")
+numeric_features <- features[as.vector(unlist(lapply(providers[[1]][, features], is.numeric)))]
 ycol <- "throughput_mbits"
 
-cormat <- cor(ul_data[, numeric_features])
-corrplot(cormat, method="color")
+# TODO: facet wrap
+lapply(
+  providers,
+  function(provider) ggcorrplot(cor_pmat(provider[, numeric_features]), title=unique(provider$provider))
+)
 
 # TODO: Check if chr columns in data
-X <- ul_data[, features] #%>% dummy_cols(
-  #remove_selected_columns = TRUE, 
-  #remove_first_dummy = TRUE
-  #)
+chr_features <- features[as.vector(unlist(lapply(providers[[1]][, features], is.character)))]
 
+X <- lapply(providers, function(provider) provider[, features])
 
-# Scale Data
-ntrain <- floor(nrow(X)*0.9)
-ntest <- nrow(X) - ntrain
+if(length(chr_features) > 0){
+  lapply(providers, 
+         function(provider) dummy_cols(provider, 
+                                       remove_first_dummy = TRUE, 
+                                       remove_selected_columns = TRUE)) 
+}
 
-scaled <- scale(X[1:ntrain, numeric_features])
-center_history = attr(scaled, "scaled:center")
-scale_history = attr(scaled, "scaled:scale")
+name_mapping <- list("Vodafone" = "vodafone", 
+                     "T-Mobile" = "tmobile", 
+                     "O2" = "o2")
 
-traindata <- X[1:ntrain, ]
-traindata[numeric_features] <- scaled
+ntrain <- lapply(X, function(provider) floor(nrow(provider)*0.8))
+ntest <- list(vodafone = nrow(providers$vodafone)-ntrain$vodafone, 
+              tmobile = nrow(providers$tmobile)-ntrain$tmobile, 
+              o2 = nrow(providers$o2)-ntrain$o2)
 
-testdata <- X[(ntrain+1):(ntrain+ntest), ]
-testdata[numeric_features] <- scale(testdata[numeric_features], 
-                                    center = center_history, 
-                                    scale = scale_history)
-
-# Create input
-Xtrain <- as.matrix(traindata[, colnames(traindata) != ycol])
-ytrain <- ts(traindata[, ycol])
-Xtest <- as.matrix(testdata[, colnames(testdata) != ycol])
-ytest <- ts(testdata[, ycol])
-
-# Check if any columns are 0
-for (col in colnames(Xtrain)){
-  if (all(Xtrain[, col] == 0)) {
-    Xtrain <- Xtrain[, colnames(Xtrain) != col]
-    Xtest <- Xtest[, colnames(Xtest) != col]
-  }
+splits <- list()
+for (provider in names(providers)){
+  splits[[paste(provider)]] <- prepare_data(data = providers[[provider]], 
+                                          ntrain = ntrain[[provider]], 
+                                          ntest = ntest[[provider]])
 }
 
 # Model
-model <- auto.arima(ytrain, xreg = Xtrain, lambda = "auto")
+if (any(features=="throughput_mbits")) 
+  features <- features[-which(features=="throughput_mbits")]
+models <- list()
+
+for (provider in names(providers)){
+  splits[[provider]][["Xtrain"]][, features] <- sapply(
+    splits[[provider]][["Xtrain"]][, features], as.numeric )
+  models[[paste(provider)]] <- auto.arima(
+    splits[[provider]][["ytrain"]], 
+    xreg = splits[[provider]][["Xtrain"]][, features])
+}
+
 arimaorder(model)
 
 # Prediction
@@ -120,4 +142,4 @@ ggplot(plot_data, aes(x=index, y=value, color=type)) + geom_line()
 
 rmse(actual, pred_values)
 mae(actual, pred_values)  
-
+cor(actual, pred_values)^2
