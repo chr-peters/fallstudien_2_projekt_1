@@ -21,17 +21,27 @@ o2 <- ul_data[ul_data$provider == "o2", ]
 o2$provider <- "O2"
 providers <- list("vodafone" = vodafone, "tmobile" = tmobile, "o2" = o2)
 
+# Sort Data by timestamp
+providers <- lapply(providers, function(provider) provider[order(provider$timestamp), ])
+
 # add timestamp and index
 for (i in 1:length(providers)){
   providers[[i]]$timestamp <- providers[[i]]$timestamp_ms %>% anytime()
   providers[[i]]$index <- 1:nrow(providers[[i]])
 }
 
-# Sort Data by timestamp
-providers <- lapply(providers, function(provider) provider[order(provider$timestamp), ])
 
 # Graphs
 # Throughput
+#lapply(providers, function(provider)
+#  ggplot(provider, 
+#         aes(x=format(timestamp, "%Y-%m-%d"), y=format(timestamp, "%H:%M:%S"))) + 
+#           geom_line() + facet_wrap(~scenario) + 
+#           ggtitle(unique(provider$provider)))
+
+#ggplot(providers[[1]], aes(x=format(timestamp, "%m-%d"), y=format(timestamp, "%H:%M:%S"))) + 
+#  geom_line() + facet_wrap(~scenario)
+
 lapply(providers, function(provider) 
   ggplot(provider, 
          aes(x=timestamp, y=throughput_mbits)
@@ -50,6 +60,7 @@ lapply(providers, function(provider)
     ggtitle(unique(provider$provider))
 )
 
+
 # Acf und pAcf
 throughputs <- list(vodafone = providers$vodafone$throughput_mbits, 
                     tmobile = providers$tmobile$throughput_mbits, 
@@ -60,7 +71,10 @@ plot_acf(throughputs, type="pacf")
 # Cross Correlation
 features <- c("throughput_mbits", "payload_mb", "f_mhz", 
               "rsrp_dbm", "rsrq_db", "ta", "velocity_mps")
-lapply(providers, function(provider) plot_ccf(provider[[1]], features, lag.max = 10))
+lapply(providers, function(provider) plot_ccf(provider, features, lag.max = 10))
+
+# divide in train und test
+
 
 # Select features
 #ul_data$day <- ul_data$timestamp_ms %>% anytime() %>% format("%d") %>% as.integer()

@@ -51,7 +51,7 @@ plot_acf <- function(throughputs, type = c("acf", "pacf")){
   
 }
 
-plot_ccf <- function(provider_data, features, lag.max=10){
+plot_ccf <- function(provider, features, lag.max=10){
   
   if (any(features=="throughput_mbits")) 
     features <- features[-which(features=="throughput_mbits")]
@@ -65,7 +65,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   grid.text(
     paste(
       "Kreuzkorrelationsfunktion:", 
-      unique(provider_data$provider), sep = " "), 
+      unique(provider["provider"]), sep = " "), 
     vp = viewport(layout.pos.row = 1, layout.pos.col = 1:ncol))
   
   lag.max <- 10
@@ -73,7 +73,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   j <- 1
   
   if(any(features=="distance_m")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["distance_m"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["distance_m"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("Distanz in Metern")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -84,8 +84,8 @@ plot_ccf <- function(provider_data, features, lag.max=10){
     else j <- j + 1
   }
   
-  if(any(features=="distance_m")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["latitude"], 
+  if(any(features=="latitude")){
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["latitude"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("Höhenmaß")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -96,20 +96,9 @@ plot_ccf <- function(provider_data, features, lag.max=10){
     else j <- j + 1
   }
   
-  if(any(features=="latitude")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider[features[i]], 
-                  lag.max = lag.max) + 
-      ylab("Korrelation") + ggtitle(features[i])
-    print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
-    if(j==ncol) {
-      i <- i+1
-      j <- 1
-    }
-    else j <- j + 1
-  }
   
   if(any(features=="longitude")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["longitude"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["longitude"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("Breitenmaß")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -121,7 +110,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="altitude")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["altitude"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["altitude"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("Höhenlage")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -133,7 +122,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="velocity_mps")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["velocity_mps"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["velocity_mps"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("Geschwindigkeit in MpS")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -145,7 +134,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="acceleration_mpss")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["acceleration_mpss"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["acceleration_mpss"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("Beschleunigung in MpS")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -157,7 +146,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="direction")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider[direction], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["direction"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("Richtung")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -169,7 +158,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="rsrp_dbm")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["rsrp_dbm"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["rsrp_dbm"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("RSRP in dbm")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -181,7 +170,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="rsrq_db")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["rsrq_db"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["rsrq_db"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("RSRQ in db")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -193,7 +182,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="rssnr_db")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["rssnr_db"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["rssnr_db"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("RSSNR in db")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -205,7 +194,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="cqi")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["cqi"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["cqi"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("Kanalqualitätsindex")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -217,7 +206,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="ss")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["ss"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["ss"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("SS")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -229,7 +218,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="ta")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["ta"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["ta"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("TA")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -241,7 +230,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="ci")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["ci"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["ci"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("Zell-Id")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -253,7 +242,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="pci")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["pci"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["pci"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("physische Zell-Id")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -265,7 +254,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="payload_mb")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["payload_mb"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["payload_mb"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("Payload in mb")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -277,7 +266,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="rtt_ms")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["rtt_ms"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["rtt_ms"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("RTT in ms")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -289,7 +278,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="txPower_dbm")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["txPower_dbm"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["txPower_dbm"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("Sendeleistung in dbm")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
@@ -301,7 +290,7 @@ plot_ccf <- function(provider_data, features, lag.max=10){
   }
   
   if(any(features=="f_mhz")){
-    plot <- ggCcf(x=provider$throughput_mbits, y=provider["f_mhz"], 
+    plot <- ggCcf(x=provider["throughput_mbits"], y=provider["f_mhz"], 
                   lag.max = lag.max) + 
       ylab("Korrelation") + ggtitle("Frequenz in MhZ")
     print(plot, vp=viewport(layout.pos.row = i, layout.pos.col = j))
