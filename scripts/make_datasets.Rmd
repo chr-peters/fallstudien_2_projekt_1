@@ -236,6 +236,7 @@ ggplot(
   ggtitle("First three campus drives for tmobile (dataset_ul)")
 ```
 
+<<<<<<< HEAD
 ```{r}
 ggplot(
   filter(dataset_context, timestamp<=ymd(20181211), provider=="tmobile", scenario=="campus"),
