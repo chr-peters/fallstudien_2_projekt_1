@@ -1,0 +1,90 @@
+---
+title: "xgboost Data-Rate Prediction"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE}
+library(tidyverse)
+
+library(mlr3)
+```
+
+# Upload-Rate Prediction
+
+## Reading the Data
+
+```{r}
+data_dir = "../datasets/"
+
+dataset_ul = read_csv(
+  str_c(data_dir, "dataset_ul.csv"), 
+  col_types = cols(
+    drive_id = col_integer(),
+    scenario = col_factor(), 
+    provider = col_factor(), 
+    ci = col_factor(), 
+    enodeb = col_factor()
+  )
+) %>% select(
+  drive_id,
+  timestamp,
+  scenario,
+  provider,
+  velocity_mps,
+  acceleration_mpss,
+  rsrp_dbm,
+  rsrq_db,
+  rssnr_db,
+  cqi,
+  ss,
+  ta,
+  ci,
+  enodeb,
+  f_mhz,
+  payload_mb,
+  throughput_mbits
+) %>% drop_na() %>% rowid_to_column(var="row_id_original")
+
+glimpse(dataset_ul)
+```
+
+## Create the Prediction Task
+
+```{r}
+task_ul = TaskRegr$new(
+  id = "ul_prediction",
+  backend = dataset_ul %>% select(-drive_id, -timestamp),
+  target = "throughput_mbits"
+)
+
+task_ul$col_roles$name = "row_id_original"
+task_ul$col_roles$feature = setdiff(task_ul$col_roles$feature, "row_id_original")
+
+task_ul
+```
+
+## Create Data Splitting Strategies for Testing and Validation
+
+```{r}
+make_outer_resampling = function(task, drive_ids_train, drive_ids_test) {
+  row_ids_train = (
+    tibble(task$row_names) %>% 
+      inner_join(dataset_ul, by=c("row_name"="row_id_original")) %>% 
+      filter(drive_id %in% drive_ids_train)
+  )$row_id
+  
+  row_ids_test = (
+    tibble(task$row_names) %>% 
+      inner_join(dataset_ul, by=c("row_name"="row_id_original")) %>% 
+      filter(drive_id %in% drive_ids_test)
+  )$row_id
+  
+  result = rsmp("custom")
+  result$instantiate(task, train_sets=list(row_ids_train), test_sets=list(row_ids_test))
+  return(result)
+}
+```
