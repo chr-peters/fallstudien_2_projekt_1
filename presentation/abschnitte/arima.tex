@@ -1,9 +1,57 @@
-\section{ARIMA}
+\subsection{ARIMA}
 
-\begin{frame}{ARIMA}
-    Hier kommt z.B. was \"uber ARIMA
+
+\begin{frame}{Aufgabenstellung Task I: Vorhersage der Datenrate}
+\begin{itemize}
+\item weitere Ansätze zur Vorhersage der Zielgröße "throughput"
+\item Aussagekraft der Einflussvariablen
+\end{itemize}
 \end{frame}
 
-\begin{frame}{ARIMA}
-    Und noch mehr \"uber ARIMA
+\begin{frame}{Lösungsansätze}
+\begin{itemize}
+\item XGboost
+\item ARMA Modell mit Regressionsfehlern
+\end{itemize}
+\end{frame}
+
+\begin{frame}{ARMA Modell mit Regressionsfehlern}
+Lineares Modell: $y = \beta \cdot X + \epsilon$, wobei $\epsilon$ Störfaktor und $\epsilon_{i}$ i.i.d.
+\begin{itemize}
+\item Problem: Autokorrelation
+\item Lösung: Anwendung des ARMA Modells auf die Regressionsfehler
+\end{itemize}
+\end{frame}
+
+\begin{frame}{ARMA Modell mit Regressionsfehlern}
+$ARMA(p,q)$: zusammengesetzes Modell aus
+\begin{itemize}
+\item $AR(p)$ (Auto Regressive): basiert auf vergangenen Werten $\epsilon_{i}$ des Response 
+\item $MA(q)$ (Moving Average): basiert auf Fehlern $e_{i}$ zwischen vergangenen Vorhersagen und wahrem Wert des Response
+\item Modellgleichung des ARMA Modells: 
+\begin{center}
+$\epsilon_{i} = \underbrace{\phi_{1}\epsilon_{i-1}+ ... + \phi_{p}\epsilon_{i-p}}_{AR(p)} \underbrace{- \theta_{1}e_{i-1} - ... - \theta_{q}e_{i-q}}_{MA(q)} + \eta_{i}$,
+\end{center}
+mit $\eta_{i}$ als Störfaktor
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Wahl der Parameter p, q}
+\begin{itemize}
+\item ACF (Autocorrelationfunktion) und PACF (partial Autocorrelationfunction) beschreiben die Korrelation der Lags mit dem aktuellen Zeitpunkt
+\item PACF beinhaltet nur direkte Einflüsse 
+\item ACF dagegen betrachtet auch solche Einflüsse die indirekt sind
+\item die Funktionen legen damit die Wahl der Parameter p und q der Modell fest
+\end{itemize}
+\begin{center}
+hier könnte ein Bild sein
+\end{center}
+\end{frame}
+
+\begin{frame}{Modellgleichung ARMA mit Regressionsfehlern}
+Insgesamt ist die Modellgleichung gegeben durch
+\begin{center}
+$y_{i} = \beta_{0} + \beta_{1}x_{1} + ... + \beta_{p}x_{p} + \phi_{1}\epsilon_{i-1}+ ... + \phi_{p}\epsilon_{i-p}$ \\
+$- \theta_{1}e_{i-1} - ... - \theta_{q}e_{i-q}  + \eta_{i}$
+\end{center}
 \end{frame}
