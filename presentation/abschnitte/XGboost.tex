@@ -1,4 +1,39 @@
-\subsection{XGboost}
-\begin{frame}{frame}
-hallo 
+\subsection{Gradient Boosted Trees}
+
+\begin{frame}{Gradient Boosted Trees}
+    \begin{itemize}
+        \item Kann man aus vielen "schwachen" Lernern einen starken Lerner konstruieren?
+            \begin{itemize}
+                \item[\Rightarrow] Ja, Boosting ist eines der m\"achtigsten Konzepte des Machine Learning \cite{elements}
+            \end{itemize}
+        \item Kombination von einfachen CART B\"aumen zu einem starken Ensemble
+            \begin{itemize}
+                \item[\Rightarrow] \"Ahnlich zu Random Forest
+            \end{itemize}
+        \item Der Unterschied zum Random Forest liegt im Training!
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Training von Gradient Boosted Trees}
+    \begin{itemize}
+        \item B\"aume werden nacheinander zum Ensemble hinzugef\"ugt
+        \item Jeder neue Baum versucht, die Schw\"achen seiner Vorg\"anger "auszub\"ugeln"
+            \begin{itemize}
+                \item[\Rightarrow] \textit{Additives Training}
+            \end{itemize}
+        \item Je mehr B\"aume aufgenommen werden, desto geringer wird der Training-Error (das Modell wird aber komplexer)
+            \begin{itemize}
+                \item[\Rightarrow] Kontrolle des \textit{Bias-Variance Tradeoffs}
+                \item[\Rightarrow] Zus\"atzlich gibt es Regularisierungs-Parameter
+            \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Implementierung: XGBoost}
+    \begin{itemize}
+        \item Liefert state-of-the-art Performance in einer Vielzahl von ML-Problemen
+        \item In 2015 haben 19/25 Gewinner von Kaggle-Competitions XGBoost eingesetzt
+        \item Kann problemlos auf mehrere Milliarden Training Samples skaliert werden 
+        \item L\"asst sich aber auch hervorragend auf ressourcenbegrenzten Systemen einsetzen \cite{XGBoost}
+    \end{itemize}
 \end{frame}
