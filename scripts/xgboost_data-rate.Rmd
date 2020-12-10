@@ -9,8 +9,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, message=FALSE}
 library(tidyverse)
+library(ggplot2)
 
 library(mlr3)
+library(mlr3learners)
+library(mlr3pipelines)
 ```
 
 # Upload-Rate Prediction
@@ -87,4 +90,43 @@ make_outer_resampling = function(task, drive_ids_train, drive_ids_test) {
   result$instantiate(task, train_sets=list(row_ids_train), test_sets=list(row_ids_test))
   return(result)
 }
+```
+
+## Create the Prediction Pipeline
+
+```{r}
+make_learner = function() {
+  factor_encoding = po(
+    "encode",
+    method = "one-hot",
+    affect_columns = selector_type("factor")
+  )
+  xgboost = lrn("regr.xgboost", nrounds=100) # default to 100 boosting rounds
+  pipe = factor_encoding %>>% PipeOpLearner$new(xgboost)
+  learner = GraphLearner$new(pipe)
+  return(learner)
+}
+learner_ul = make_learner()
+```
+
+## Validation Results
+
+```{r}
+resampling_result_ul = resample(
+  task = task_ul,
+  learner = learner_ul,
+  resampling = make_outer_resampling(task_ul, drive_ids_train=1:7, drive_ids_test=8:10),
+  store_models = TRUE
+)
+```
+
+```{r}
+resampling_result_ul$aggregate(msr("regr.rsq"))
+resampling_result_ul$aggregate(msr("regr.mae"))
+```
+
+```{r}
+predictions_ul = as.data.table(resampling_result_ul$prediction())
+ggplot(predictions_ul, aes(x=truth, y=response)) +
+  geom_point()
 ```
