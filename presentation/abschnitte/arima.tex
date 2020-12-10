@@ -55,11 +55,31 @@
 		\item Ersetze Fehler an zukünftigen Zeitpunkten durch 0
 	\end{itemize}
 	\underline{Beispiel}: $h=2, k=1, p=2, q=2$
-	\begin{align*}
-		y_t &= c + \beta_1 x_{t} + \phi_1\epsilon_{t-1} + \phi_2\epsilon_{t-2} + \theta_1e_{t-1} + \theta_2e_{t-2} + e_t \\		
-		\widehat{y_{t+1}} &= c + \beta_1 x_{t} + \phi_1\epsilon_{t} + \phi_2\epsilon_{t-1} + \theta_1e_{t} + \theta_2e_{t-1} + \underbrace{\widehat{e_{t+1}}}_{=0}\\
-		\widehat{y_{t+2}} &= c + \beta_1 x_{t} + \phi_1\underbrace{\widehat{\epsilon_{t+1}}}_{=0} + \phi_2\epsilon_t + \theta \underbrace{\widehat{e_{t+1}}}_{=0} + \theta e_t + \underbrace{\widehat{e_{t+2}}}_{=0}
-	\end{align*}
-	 
+	\begin{alignat*}{2}
+		y_t &= c + \beta_1 x_{t} + \epsilon_t \text{ mit }&&\epsilon_{t} = \phi_1\epsilon_{t-1} + \phi_2\epsilon_{t-2} + \theta_1e_{t-1} + \theta_2e_{t-2} + e_t \\		
+		\widehat{y_{t+1}} &= c + \beta_1 x_{t} + \widehat{\epsilon_{t+1}} \text{ mit }&& \widehat{\epsilon_{t+1}} = \phi_1\epsilon_{t} + \phi_2\epsilon_{t-1} + \theta_1e_{t} + \theta_2e_{t-1} + \underbrace{\widehat{e_{t+1}}}_{=0}\\
+		\widehat{y_{t+2}} &= c + \beta_1 x_{t} + \widehat{\epsilon_{t+2}}\text{ mit }&&\widehat{\epsilon_{t+2}} = \phi_1\widehat{\epsilon_{t+1}} + \phi_2\epsilon_t + \theta \underbrace{\widehat{e_{t+1}}}_{=0} + \theta e_t + \underbrace{\widehat{e_{t+2}}}_{=0}
+	\end{alignat*}
 \end{frame}
+
+\begin{frame}{Validierung}
+	\textbf{k-fache Kreuzvalidierung}
+	\begin{itemize}
+		\item beachtet Abhängigkeit der Datenpunkte nicht
+		\item zerstört zeitliche Komponente
+		\item verwendet eventuell zukünftige Beobachtungen für Prognose der Gegenwart
+	\end{itemize}
+	$\Rightarrow$ \textbf{Kreuzvalidierung für Zeitreihen}
+\end{frame}
+	
+%\begin{frame}{Validierung}
+	%\begin{figure}[h]
+	%	\centering
+%		\includegraphics[scale=0.25]{kreuzvalidierung}
+		%\caption{Grafik der auf der ersten Testfahrt im Szenario ``Highway'' gemessenen Datenübertragungsrate.}
+		%\label{kreuzvalidierung}
+	%\end{figure}
+%\end{frame}
+	
+
 
