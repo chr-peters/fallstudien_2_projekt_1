@@ -1,4 +1,4 @@
-\subsection{ARIMA}
+\subsection{Regression mit ARMA-Fehlern}
 
 \begin{frame}{Situation}
 	\begin{figure}[]
@@ -62,24 +62,6 @@
 	\end{alignat*}
 \end{frame}
 
-\begin{frame}{Validierung}
-	\textbf{k-fache Kreuzvalidierung}
-	\begin{itemize}
-		\item beachtet Abhängigkeit der Datenpunkte nicht
-		\item zerstört zeitliche Komponente
-		\item verwendet eventuell zukünftige Beobachtungen für Prognose der Gegenwart
-	\end{itemize}
-	$\Rightarrow$ \textbf{Kreuzvalidierung für Zeitreihen}
-\end{frame}
-	
-\begin{frame}{Validierung}
-	\begin{figure}[h]
-		\centering
-		\includegraphics[scale=0.3]{kreuzvalidierung}
-		\caption{Grafik der auf der ersten Testfahrt im Szenario ``Highway'' gemessenen Datenübertragungsrate.}
-		\label{kreuzvalidierung}
-	\end{figure}
-\end{frame}
 	
 
 
