@@ -1,57 +1,85 @@
 \subsection{ARIMA}
 
-
-\begin{frame}{Aufgabenstellung Task I: Vorhersage der Datenrate}
-\begin{itemize}
-\item weitere Ansätze zur Vorhersage der Zielgröße "throughput"
-\item Aussagekraft der Einflussvariablen
-\end{itemize}
+\begin{frame}{Situation}
+	\begin{figure}[]
+		%\centering
+		\includegraphics[scale=0.25]{highway_drive_one}
+		\caption{Grafik der auf der ersten Testfahrt im Szenario ``Highway'' gemessenen Datenübertragungsrate.}
+		\label{highway_drive_one}
+	\end{figure}
+	
+	\begin{itemize}
+		\item Zeitreihe $y_1,...,y_n$ (Zielvariable)
+		\item k Zeitreihen $x_{i,1},...,x_{i,n}$ für $i=1,...,k$ (Einflussvariablen)
+	\end{itemize}
 \end{frame}
 
-\begin{frame}{Lösungsansätze}
-\begin{itemize}
-\item XGboost
-\item ARMA Modell mit Regressionsfehlern
-\end{itemize}
+\begin{frame}{Regression mit ARMA-Fehlern}
+	\textbf{Lineares Regressionsmodell} \\
+	$$y_{t} = c + \beta_1 x_{1,t} + ... + \beta_k x_{k,t} + \epsilon_t \text{ mit Fehler } \epsilon_t \text{ und Konstante}c$$ \\
+	Annahmen an Fehler:
+	\begin{itemize}
+		\item $\forall t \in \{1,...,n\}: E(\epsilon_t) = 0$
+		\item $\forall s, t \in \{1,...,n\} s\neq t: Cov(\epsilon_s, \epsilon_t)=0 $
+		\item $Cov((\epsilon_1,...,\epsilon_n)^T)=\sigma^2 \mathds{1}_n$
+	\end{itemize}
+	\textbf{Annahmen sind in unserer Situation nicht einhaltbar!}
 \end{frame}
 
-\begin{frame}{ARMA Modell mit Regressionsfehlern}
-Lineares Modell: $y = \beta \cdot X + \epsilon$, wobei $\epsilon$ Störfaktor und $\epsilon_{i}$ i.i.d.
-\begin{itemize}
-\item Problem: Autokorrelation
-\item Lösung: Anwendung des ARMA Modells auf die Regressionsfehler
-\end{itemize}
+\begin{frame}{Regression mit ARMA-Fehlern}
+	\textbf{ARMA(p, q)}
+	Zusammengesetzes Modell aus
+	\begin{itemize}
+		\item $AR(p)$ (Auto Regressive): $y_{t} = c + \phi_1 y_{t-1} + ... + \phi_p y_{t-p} + e_t \text{ mit Fehler }e_t\text{ und Konstante}c$
+		\item $MA(q)$ (Moving Average): $y_{t} = c + e_t + \theta_1 e_{t-1} + ... + \theta_q e_{t-q}\text{ mit White Noise }e_t,e_{t-1},...,e_{t-q}\text{ und Konstante }c$
+	\end{itemize}
+	Zusammengesetzt:
+	$$y_{t} = c + \underbrace{\phi_1 y_{t-1} + ... + \phi_p y_{t-p}}_{AR(p)} + \underbrace{\theta_1 e_{t-1} + ... + \theta_q e_{t-q}}_{MA(q)} + e_t$$
 \end{frame}
 
-\begin{frame}{ARMA Modell mit Regressionsfehlern}
-$ARMA(p,q)$: zusammengesetzes Modell aus
-\begin{itemize}
-\item $AR(p)$ (Auto Regressive): basiert auf vergangenen Werten $\epsilon_{i}$ des Response 
-\item $MA(q)$ (Moving Average): basiert auf Fehlern $e_{i}$ zwischen vergangenen Vorhersagen und wahrem Wert des Response
-\item Modellgleichung des ARMA Modells: 
-\begin{center}
-$\epsilon_{i} = \underbrace{\phi_{1}\epsilon_{i-1}+ ... + \phi_{p}\epsilon_{i-p}}_{AR(p)} \underbrace{- \theta_{1}e_{i-1} - ... - \theta_{q}e_{i-q}}_{MA(q)} + \eta_{i}$,
-\end{center}
-mit $\eta_{i}$ als Störfaktor
-\end{itemize}
+\begin{frame}{Regression mit ARMA-Fehlern}
+	\textbf{Anwendung auf Regressionsfehler} \\
+	\underline{Erinnerung}: Fehler $\epsilon_t$ des linearen Modells sind autokorreliert $\Rightarrow$ erfüllen Voraussetzungen nicht\\
+	\underline{Lösung}: Wende ARMA-Modell auf Fehler an
+	$$\epsilon_{t} = c + \phi_1 \epsilon_{t-1} + ... + \phi_p \epsilon_{t-p} + \theta_1 e_{t-1} + ... + \theta_q e_{t-q} + e_t$$
+	\textbf{Modellgleichung Regression mit ARMA-Fehlern}:
+	$$y_t = c + \sum_{i=1}^{k}{\beta_i x_{i,t}} + \underbrace{\sum_{j=1}^{p}{\phi_j\epsilon_{t-j}}}_{\text{vergangene Fehler LM}} + \underbrace{\sum_{k=1}^{q}{\theta_k e_{t-k}}}_{\text{vergangene Fehler ARMA}} + e_t$$
+	
 \end{frame}
 
-\begin{frame}{Wahl der Parameter p, q}
-\begin{itemize}
-\item ACF (Autocorrelationfunktion) und PACF (partial Autocorrelationfunction) beschreiben die Korrelation der Lags mit dem aktuellen Zeitpunkt
-\item PACF beinhaltet nur direkte Einflüsse 
-\item ACF dagegen betrachtet auch solche Einflüsse die indirekt sind
-\item die Funktionen legen damit die Wahl der Parameter p und q der Modell fest
-\end{itemize}
-\begin{center}
-hier könnte ein Bild sein
-\end{center}
+\begin{frame}{Regression mit ARMA-Fehlern}
+	\textbf{h-Schritt Punktvorhersage}\\
+	\begin{itemize}
+		\item Ersetze Beobachtungen zu zukünftigen Zeitpunkten mit deren Vorhersagen
+		\item Ersetze Fehler an vergangenen Zeitpunkten durch das entsprechende Residuum
+		\item Ersetze Fehler an zukünftigen Zeitpunkten durch 0
+	\end{itemize}
+	\underline{Beispiel}: $h=2, k=1, p=2, q=2$
+	\begin{alignat*}{2}
+		y_t &= c + \beta_1 x_{t} + \epsilon_t \text{ mit }&&\epsilon_{t} = \phi_1\epsilon_{t-1} + \phi_2\epsilon_{t-2} + \theta_1e_{t-1} + \theta_2e_{t-2} + e_t \\		
+		\widehat{y_{t+1}} &= c + \beta_1 x_{t} + \widehat{\epsilon_{t+1}} \text{ mit }&& \widehat{\epsilon_{t+1}} = \phi_1\epsilon_{t} + \phi_2\epsilon_{t-1} + \theta_1e_{t} + \theta_2e_{t-1} + \underbrace{\widehat{e_{t+1}}}_{=0}\\
+		\widehat{y_{t+2}} &= c + \beta_1 x_{t} + \widehat{\epsilon_{t+2}}\text{ mit }&&\widehat{\epsilon_{t+2}} = \phi_1\widehat{\epsilon_{t+1}} + \phi_2\epsilon_t + \theta \underbrace{\widehat{e_{t+1}}}_{=0} + \theta e_t + \underbrace{\widehat{e_{t+2}}}_{=0}
+	\end{alignat*}
 \end{frame}
 
-\begin{frame}{Modellgleichung ARMA mit Regressionsfehlern}
-Insgesamt ist die Modellgleichung gegeben durch
-\begin{center}
-$y_{i} = \beta_{0} + \beta_{1}x_{1} + ... + \beta_{p}x_{p} + \phi_{1}\epsilon_{i-1}+ ... + \phi_{p}\epsilon_{i-p}$ \\
-$- \theta_{1}e_{i-1} - ... - \theta_{q}e_{i-q}  + \eta_{i}$
-\end{center}
+\begin{frame}{Validierung}
+	\textbf{k-fache Kreuzvalidierung}
+	\begin{itemize}
+		\item beachtet Abhängigkeit der Datenpunkte nicht
+		\item zerstört zeitliche Komponente
+		\item verwendet eventuell zukünftige Beobachtungen für Prognose der Gegenwart
+	\end{itemize}
+	$\Rightarrow$ \textbf{Kreuzvalidierung für Zeitreihen}
 \end{frame}
+	
+\begin{frame}{Validierung}
+	\begin{figure}[h]
+		\centering
+		\includegraphics[scale=0.3]{kreuzvalidierung}
+		\caption{Grafik der auf der ersten Testfahrt im Szenario ``Highway'' gemessenen Datenübertragungsrate.}
+		\label{kreuzvalidierung}
+	\end{figure}
+\end{frame}
+	
+
+
