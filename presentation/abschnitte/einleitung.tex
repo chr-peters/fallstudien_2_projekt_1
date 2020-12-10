@@ -1,10 +1,41 @@
 \section{Einleitung}
 
 \begin{frame}{Einleitung}
-    Hier stehen ein paar Dinge \"uber die Einleitung:
-    \begin{itemize}
-        \item Dies
-        \item und
-        \item das
+	\begin{itemize}
+		\item $\textbf{Motivation}$: Verbesserung mobiler Kommunikation von Endgäten \\
+		$\rightarrow$ Vermeiden von z.B. "packet loss" und als Folge auch Retransmission
+		\item Wie kann das erreicht werden? \\
+		$\rightarrow$ Datenratenprädiktion um optimalen Zeitpunkt zum Senden von Daten zu ermitteln
     \end{itemize}
 \end{frame}
+
+
+\begin{frame}{Datenbeschreibung}
+Situation:
+	\begin{itemize}
+		\item echt Welt Messungen im öffentlichen LTE Netzwerk der 3 deutschen Mobilfunkanbieter o2, T-Mobile und Vodafone
+		\item Aufteilung in mehrere Szenarien: "campus", "urban", "suburban" und "highway"
+		\item pro Mobilfunkanbieter und Szenario wurden 10 Testfahrten durchgeführt
+	\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Datenbeschreibung}
+	\begin{itemize}
+		\item "context": passive Messungen 1s\\
+		$\rightarrow$ $\textbf{RSRP}$ \\
+		$\rightarrow$ $\textbf{RSRQ}$ \\
+		$\rightarrow$ $\textbf{CQI}$ \\
+		$\rightarrow$ $\textbf{TA}$ \\
+		$\rightarrow$ $\textbf{velocity}$ \\
+		$\rightarrow$ $\textbf{Cell ID}$  \\
+		$\rightarrow$ $\textbf{payload size}$ \\
+		\item "ul" / "dl": aktive Messungen 10s \\
+		$\rightarrow$ $\textbf{throughput}$ - Datenrate \\
+		\item "cells":
+		$\rightarrow$ RSRP / RSRQ der Nachbarzellen
+	\end{itemize}
+\end{frame}
+
+
+
