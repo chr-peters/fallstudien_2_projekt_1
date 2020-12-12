@@ -1,6 +1,7 @@
 library(ggplot2)
 library(grid)
 library(rlist)
+library(forecast)
 
 NOTWORKINGplot_acf <- function(throughputs){
   

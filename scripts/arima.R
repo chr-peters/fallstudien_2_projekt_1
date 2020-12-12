@@ -24,17 +24,18 @@ providers <- list("vodafone" = vodafone, "tmobile" = tmobile, "o2" = o2)
 # Features
 features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db",
               "cqi", "ta", "velocity_mps", "scenario")
-numeric_features <- features[as.vector(unlist(lapply(train[[1]][, features], is.numeric)))]
+numeric_features <- features[as.vector(unlist(lapply(train[[1]][, features], 
+                                                     is.numeric)))]
 
 # in Training und Test aufteilen
 train <- lapply(providers, function(provider) 
   provider[
-    provider["drive_id"] != 8 & provider["drive_id"] != 9 & provider["drive_id"] != 10, 
-    features])
+    provider["drive_id"] != 8 & provider["drive_id"] != 9 & 
+      provider["drive_id"] != 10, features])
 test <- lapply(providers, function(provider) 
   provider[
-    provider["drive_id"] == 8 | provider["drive_id"] == 9 | provider["drive_id"] == 10, 
-    features])
+    provider["drive_id"] == 8 | provider["drive_id"] == 9 | 
+      provider["drive_id"] == 10, features])
 
 
 # ACF und pACF von throughput
@@ -82,24 +83,24 @@ train[["o2"]]$scenario <- factor(train[["o2"]]$scenario)
 lm_o2 <- lm(throughput_mbits ~ ., data = train[["o2"]])
 VIF(lm_o2)
 
-# ohne RSRQ, ohne Frequenz
-features <- c("throughput_mbits", "payload_mb", "rsrp_dbm",
+# ohne RSRQ ohne Frequenz
+features <- c("throughput_mbits", "payload_mb", "rsrp_dbm", 
               "cqi", "ta", "velocity_mps", "scenario")
 
 train[["vodafone"]] <- train[["vodafone"]][, features]
 lm_vodafone <- lm(throughput_mbits ~ ., data = train[["vodafone"]])
 VIF(lm_vodafone)
-res_vodafone <- data.frame(res=lm_vodafone$residuals, provider="Vodafone")
+res_vodafone <- data.frame(res=rstandard(lm_vodafone), provider="Vodafone")
 
 train[["tmobile"]] <- train[["tmobile"]][, features]
 lm_tmobile <- lm(throughput_mbits ~ ., data = train[["tmobile"]])
 VIF(lm_tmobile)
-res_tmobile <- data.frame(res=lm_tmobile$residuals, provider="T-Mobile")
+res_tmobile <- data.frame(res=rstandard(lm_tmobile), provider="T-Mobile")
 
 train[["o2"]] <- train[["o2"]][, features]
 lm_o2 <- lm(throughput_mbits ~ ., data = train[["o2"]])
 VIF(lm_o2)
-res_o2 <- data.frame(res=lm_o2$residuals, provider="O2")
+res_o2 <- data.frame(res=rstandard(lm_o2), provider="O2")
 
 ## qq-Plots
 res_data <- rbind(res_vodafone, res_tmobile, res_o2)
@@ -107,6 +108,11 @@ ggplot(res_data, aes(sample=res)) + geom_qq() +
   geom_abline(intercept = 0, slope = 1, color = "red", size = 1, alpha = 0.8) + 
   facet_wrap(~provider) + ggtitle("QQ-Plots Normalverteilung") + 
   xlab("theoretische Quantile") + ylab("Quantile der Residuen")
+
+# Histogramm
+ggplot(res_data, aes(x = res)) + geom_histogram(color="black", fill="pink") + 
+  facet_wrap(~ provider) + ggtitle("Histogramme der Residuen") + 
+  xlab("Residuen") + ylab("Anzahl")
 
 # Plot ACF und pACF
 plot_data <- list(vodafone = lm_vodafone$residuals, 
@@ -117,6 +123,39 @@ plot_acf(plot_data, type="acf",
 plot_acf(plot_data, type="pacf", 
          title = "partielle Autokorrelationsfunktionen der Residuen")
 
+# Features
+features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db",
+              "cqi", "ta", "velocity_mps", "scenario", "drive_id")
+lm_features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db",
+                 "cqi", "ta", "velocity_mps", "scenario")
+
+# in Training und Test aufteilen
+train <- lapply(providers, function(provider) 
+  provider[
+    provider["drive_id"] != 8 & provider["drive_id"] != 9 & 
+      provider["drive_id"] != 10, features])
+test <- lapply(providers, function(provider) 
+  provider[
+    provider["drive_id"] == 8 | provider["drive_id"] == 9 | 
+      provider["drive_id"] == 10, features])
+
+numeric_features <- features[as.vector(unlist(lapply(train[[1]][, features], 
+                                                     is.numeric)))]
+cv_train <- lapply(train, function(provider) 
+  provider[provider["drive_id"] == 1 | provider["drive_id"] == 2, lm_features])
+
+
+for (test_id in 3:7){
+  
+  if(test_id > 3){
+    cv_train <- lapply(train, function(provider) 
+      rbind(cv_train, provider[provider["drive_id"] == test_id-1, lm_features]))
+  }
+  cv_test <- lapply(train, function(provider) 
+    provider[provider["drive_id"] == test_id, lm_features])
+  
+  
+}
 
 # Sort Data by timestamp
 providers <- lapply(providers, function(provider) provider[order(provider$timestamp), ])
