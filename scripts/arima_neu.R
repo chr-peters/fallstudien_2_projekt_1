@@ -3,7 +3,8 @@
 setwd("~/GitHub/fallstudien_2_projekt_1/datasets")
 library(tseries)
 library(regclass)
-library(car)
+library(ggplot2)
+#library(car)
 
 ul_data <- read.csv2("dataset_ul.csv", header=TRUE, sep=",", dec=".")
 ul_data <- na.omit(ul_data)
@@ -16,16 +17,16 @@ o2 <- ul_data[ul_data$provider == "o2", ]
 providers <- list("vodafone" = vodafone, "tmobile" = tmobile, "o2" = o2)
 
 
-features_s <- c("throughput_mbits", "payload_mb", #"f_mhz", 
-              "rsrp_dbm", "rsrq_db", "ta", "velocity_mps", "cqi", "scenario")
+features_s <- c("throughput_mbits", "payload_mb", #"f_mhz", "rsrq_db",
+              "rsrp_dbm", "ta", "velocity_mps", "cqi", "scenario")
 
 train <- lapply(providers, function(provider) 
   provider[provider["drive_id"] != 8 & provider["drive_id"] != 9 & provider["drive_id"] != 10, features_s])
 test <- lapply(providers, function(provider) 
   provider[provider["drive_id"] == 8 | provider["drive_id"] == 9 | provider["drive_id"] == 10, features_s])
 
-features <- c("throughput_mbits", "payload_mb", #"f_mhz", 
-                "rsrp_dbm", "rsrq_db", "ta", "velocity_mps", "cqi")
+features <- c("throughput_mbits", "payload_mb", #"f_mhz", "rsrq_db",
+                "rsrp_dbm", "ta", "velocity_mps", "cqi")
 
 # Test auf Stationarität: Augmented Dickey-Fuller Test
 
@@ -51,31 +52,36 @@ for (provider in c("vodafone", "tmobile", "o2")){
                                                 scale = attr(scaled, "scaled:scale"))
 }
 
+
+# Lineare Modelle
+
+train[["vodafone"]]$scenario <- factor(train[["vodafone"]]$scenario)
+lm_vodafone <- lm(throughput_mbits ~ ., data = train[["vodafone"]])
+
+train[["o2"]]$scenario <- factor(train[["o2"]]$scenario)
+lm_o2 <- lm(throughput_mbits ~ ., data = train[["o2"]])
+
+train[["tmobile"]]$scenario <- factor(train[["tmobile"]]$scenario)
+lm_tmobile <- lm(throughput_mbits ~ ., data = train[["tmobile"]])
+
 # Multikollinearität
+# entferne rsrq und f_mhz aus dem Modell (hohe Korrelation mit scenario)
 
+VIF(lm_vodafone) 
 
-for (i in c("vodafone")){
-  train[[i]]$scenario <- factor(train[[i]]$scenario)
-  l1 <- lm(throughput_mbits ~ ., data = train[[i]])
-}
-VIF(l1)
+VIF(lm_o2)
 
-for (i in c("o2")){
-  train[[i]]$scenario <- factor(train[[i]]$scenario)
-  l2 <- lm(throughput_mbits ~ ., data = train[[i]])
-}
-VIF(l2)
+VIF(lm_tmobile)
 
-for (i in c("tmobile")){
-  train[[i]]$scenario <- factor(train[[i]]$scenario)
-  l3 <- lm(throughput_mbits ~ ., data = train[[i]])
-}
-VIF(l3)
 
 # Residuen Plots
 
-hist(l3$residuals)
+res_vodafone <- data.frame(res=lm_vodafone$residuals, provider="Vodafone")
+res_tmobile <- data.frame(res=lm_o2$residuals, provider="T-Mobile")
+res_o2 <- data.frame(res=lm_tmobile$residuals, provider="O2")
+res_data <- rbind(res_vodafone, res_tmobile, res_o2)
 
-
+ggplot(res_data, aes(x = res)) + geom_histogram(color="black", fill="pink") + 
+  facet_wrap(~ provider) + ggtitle("Histogramme Residuen") + xlab("Residuen") + ylab("Anzahl")
 
  
