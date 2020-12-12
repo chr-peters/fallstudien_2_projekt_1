@@ -41,8 +41,10 @@ test <- lapply(providers, function(provider)
 throughputs <- list(vodafone = train$vodafone$throughput_mbits, 
                     tmobile = train$tmobile$throughput_mbits, 
                     o2 = train$o2$throughput_mbits)
-plot_acf(throughputs, type = "acf")
-plot_acf(throughputs, type = "pacf")
+plot_acf(throughputs, type = "acf", 
+         title = "Autokorrelationsfunktionen der Variable 'throughput_mbits'")
+plot_acf(throughputs, type = "pacf", 
+         title = "partielle Autokorrelationsfunktionen der Variable 'throughput_mbits'")
 
 # Test auf Stationarität: Augmented Dickey-Fuller Test
 
@@ -106,7 +108,15 @@ ggplot(res_data, aes(sample=res)) + geom_qq() +
   facet_wrap(~provider) + ggtitle("QQ-Plots Normalverteilung") + 
   xlab("theoretische Quantile") + ylab("Quantile der Residuen")
 
-ggplot(res_data, aes(y=res)) + geom_acf() + facet_wrap(~provider)
+# Plot ACF und pACF
+plot_data <- list(vodafone = lm_vodafone$residuals, 
+                        tmobile = lm_tmobile$residuals, 
+                        o2 = lm_o2$residuals)
+plot_acf(plot_data, type="acf", 
+         title = "Autokorrelationsfunktionen der Residuen")
+plot_acf(plot_data, type="pacf", 
+         title = "partielle Autokorrelationsfunktionen der Residuen")
+
 
 # Sort Data by timestamp
 providers <- lapply(providers, function(provider) provider[order(provider$timestamp), ])

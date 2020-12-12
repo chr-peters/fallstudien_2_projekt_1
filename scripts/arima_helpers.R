@@ -22,7 +22,8 @@ NOTWORKINGplot_acf <- function(throughputs){
   return(NULL)
 }
 
-plot_acf <- function(throughputs, type = c("acf", "pacf")){
+plot_acf <- function(throughputs, type = c("acf", "pacf"), 
+                     title="Autokorrelationsfunktionen"){
   
   grid.newpage()
   pushViewport(viewport(
@@ -30,12 +31,12 @@ plot_acf <- function(throughputs, type = c("acf", "pacf")){
   
   if (type == "acf") {
     chosen_func <- ggAcf
-    grid.text("Autokorrelationsfunktionen", vp = viewport(layout.pos.row = 1, 
+    grid.text(title, vp = viewport(layout.pos.row = 1, 
                                                           layout.pos.col = 1:2))
     }
   else {
     chosen_func <- ggPacf
-    grid.text("partielle Autokorrelationsfunktionen", 
+    grid.text(title, 
               vp = viewport(layout.pos.row = 1, layout.pos.col = 1:2))
     }
   
