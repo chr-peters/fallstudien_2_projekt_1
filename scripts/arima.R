@@ -9,6 +9,7 @@ library(corrplot)
 library(grid)
 library(ggcorrplot)
 library(lubridate)
+library(car)
 
 setwd("~/GitHub/fallstudien_2_projekt_1/datasets")
 ul_data <- read.csv2("dataset_ul.csv", header=TRUE, sep=",", dec=".")
@@ -22,6 +23,7 @@ providers <- list("vodafone" = vodafone, "tmobile" = tmobile, "o2" = o2)
 # Features
 features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db",
               "cqi", "ta", "velocity_mps", "scenario")
+numeric_features <- features[as.vector(unlist(lapply(train[[1]][, features], is.numeric)))]
 
 # in Training und Test aufteilen
 train <- lapply(providers, function(provider) 
@@ -41,34 +43,17 @@ throughputs <- list(vodafone = train$vodafone$throughput_mbits,
 plot_acf(throughputs, type = "acf")
 plot_acf(throughputs, type = "pacf")
 
+# Scale data
 
-for (provider in providers)
-# Scale Data
-ntrain <- floor(nrow(X)*0.9)
-ntest <- nrow(X) - ntrain
-scaled <- scale(X[1:ntrain, numeric_features])
-center_history = attr(scaled, "scaled:center")
-scale_history = attr(scaled, "scaled:scale")
-traindata <- X[1:ntrain, ]
-traindata[numeric_features] <- scaled
-testdata <- X[(ntrain+1):(ntrain+ntest), ]
-testdata[numeric_features] <- scale(testdata[numeric_features], 
-                                    center = center_history, 
-                                    scale = scale_history)
-
-residuals <- list()
-for (provider in providers){
-  #str(provider)
-  provider$scenario <- factor(provider$scenario, levels = c("campus", "highway", "urban", "suburban"))
-  lmfit <- lm(throughput_mbits ~ payload_mb + f_mhz, rsrp_dbm, rsrq_db + cqi + 
-                ta + velocity_mps, data = provider)
-  residuals[paste(provider$provider)] <- lmfit$residuals
+for (provider in c("vodafone", "tmobile", "o2")){
+  scaled <- scale(train[[provider]][, numeric_features])
+  train[[provider]][, numeric_features] <- scaled
+  attr(train[[provider]], "scaled:center") <- attr(scaled, "scaled:center")
+  attr(train[[provider]], "scaled:scale") <- attr(scaled, "scaled:center")
+  test[[provider]][, numeric_features] <- scale(test[[provider]][, numeric_features], 
+                                                center = attr(scaled, "scaled:center"), 
+                                                scale = attr(scaled, "scaled:scale"))
 }
-lmfit_vo <- lm(throughput_mbits~payload_mb + f_mhz + rsrp_dbm + rsrq_db + scenario, 
-            data = vodafone)
-
-ggAcf(lmfit$residuals)
-pacf(lmfit$residuals)
 
 # Sort Data by timestamp
 providers <- lapply(providers, function(provider) provider[order(provider$timestamp), ])
