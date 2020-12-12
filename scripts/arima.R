@@ -10,6 +10,7 @@ library(grid)
 library(ggcorrplot)
 library(lubridate)
 library(car)
+library(sugrrants)
 
 setwd("~/GitHub/fallstudien_2_projekt_1/datasets")
 ul_data <- read.csv2("dataset_ul.csv", header=TRUE, sep=",", dec=".")
@@ -43,6 +44,16 @@ throughputs <- list(vodafone = train$vodafone$throughput_mbits,
 plot_acf(throughputs, type = "acf")
 plot_acf(throughputs, type = "pacf")
 
+# Test auf Stationarität: Augmented Dickey-Fuller Test
+
+for (j in c("vodafone", "o2", "tmobile")){
+  for (i in c(features)){
+    adf.test(train[[j]][,i])$p.value
+    print(adf.test(train[[j]][,i])$p.value)
+  }
+}
+# alle p-Werte < 0.05, dh alle Variablen sind stationär
+
 # Scale data
 for (provider in c("vodafone", "tmobile", "o2")){
   scaled <- scale(train[[provider]][, numeric_features])
@@ -53,6 +64,49 @@ for (provider in c("vodafone", "tmobile", "o2")){
                                                 center = attr(scaled, "scaled:center"), 
                                                 scale = attr(scaled, "scaled:scale"))
 }
+
+
+# Multikollinearität
+
+train[["vodafone"]]$scenario <- factor(train[["vodafone"]]$scenario)
+lm_vodafone <- lm(throughput_mbits ~ ., data = train[["vodafone"]])
+VIF(lm_vodafone)
+
+train[["tmobile"]]$scenario <- factor(train[["tmobile"]]$scenario)
+lm_tmobile <- lm(throughput_mbits ~ ., data = train[["tmobile"]])
+VIF(lm_tmobile)
+
+train[["o2"]]$scenario <- factor(train[["o2"]]$scenario)
+lm_o2 <- lm(throughput_mbits ~ ., data = train[["o2"]])
+VIF(lm_o2)
+
+# ohne RSRQ, ohne Frequenz
+features <- c("throughput_mbits", "payload_mb", "rsrp_dbm",
+              "cqi", "ta", "velocity_mps", "scenario")
+
+train[["vodafone"]] <- train[["vodafone"]][, features]
+lm_vodafone <- lm(throughput_mbits ~ ., data = train[["vodafone"]])
+VIF(lm_vodafone)
+res_vodafone <- data.frame(res=lm_vodafone$residuals, provider="Vodafone")
+
+train[["tmobile"]] <- train[["tmobile"]][, features]
+lm_tmobile <- lm(throughput_mbits ~ ., data = train[["tmobile"]])
+VIF(lm_tmobile)
+res_tmobile <- data.frame(res=lm_tmobile$residuals, provider="T-Mobile")
+
+train[["o2"]] <- train[["o2"]][, features]
+lm_o2 <- lm(throughput_mbits ~ ., data = train[["o2"]])
+VIF(lm_o2)
+res_o2 <- data.frame(res=lm_o2$residuals, provider="O2")
+
+## qq-Plots
+res_data <- rbind(res_vodafone, res_tmobile, res_o2)
+ggplot(res_data, aes(sample=res)) + geom_qq() + 
+  geom_abline(intercept = 0, slope = 1, color = "red", size = 1, alpha = 0.8) + 
+  facet_wrap(~provider) + ggtitle("QQ-Plots Normalverteilung") + 
+  xlab("theoretische Quantile") + ylab("Quantile der Residuen")
+
+ggplot(res_data, aes(y=res)) + geom_acf() + facet_wrap(~provider)
 
 # Sort Data by timestamp
 providers <- lapply(providers, function(provider) provider[order(provider$timestamp), ])
