@@ -32,7 +32,7 @@ train <- lapply(providers, function(provider)
     features])
 test <- lapply(providers, function(provider) 
   provider[
-    provider["drive_id"] == 8 |provider["drive_id"] == 9 | provider["drive_id"] == 10, 
+    provider["drive_id"] == 8 | provider["drive_id"] == 9 | provider["drive_id"] == 10, 
     features])
 
 
@@ -44,7 +44,6 @@ plot_acf(throughputs, type = "acf")
 plot_acf(throughputs, type = "pacf")
 
 # Scale data
-
 for (provider in c("vodafone", "tmobile", "o2")){
   scaled <- scale(train[[provider]][, numeric_features])
   train[[provider]][, numeric_features] <- scaled
