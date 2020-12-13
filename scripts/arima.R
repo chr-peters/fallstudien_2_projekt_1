@@ -145,7 +145,6 @@ numeric_features <- features[as.vector(unlist(lapply(train[[1]][, features],
 cv_train <- lapply(train, function(provider) 
   provider[provider["drive_id"] == 1 | provider["drive_id"] == 2, lm_features])
 
-mse <- list()
 for (test_id in 3:7){
   
   if(test_id > 3){
@@ -155,7 +154,12 @@ for (test_id in 3:7){
   cv_test <- lapply(train, function(provider) 
     provider[provider["drive_id"] == test_id, lm_features])
   
+  vodafone_kennzahlen <- list()
+  tmobile_kennzahlen <- list()
+  o2_kennzahlen <- list()
   for (provider in c("vodafone", "tmobile", "o2")){
+    all_mse <- data.frame(NA, row.names = as.character())
+    
     # fit model
     y <- ts(cv_train[[provider]][, "throughput_mbits"])
     xreg <- cv_train[[provider]][, lm_features[-which(lm_features=="throughput_mbits")]]
