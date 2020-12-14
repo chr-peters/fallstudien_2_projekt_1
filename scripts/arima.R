@@ -201,16 +201,21 @@ grids <- list("vodafone" = grid_vodafone,
 
 vodafone_kennzahlen <- list("mse" = data.frame(), 
                             "mae" = data.frame(), 
-                            "rsquared" = data.frame())
+                            "rsquared" = data.frame(),
+                            "aic" = data.frame())
+
 tmobile_kennzahlen <- list("mse" = data.frame(), 
                            "mae" = data.frame(), 
-                           "rsquared" = data.frame())
+                           "rsquared" = data.frame(),
+                           "aic" = data.frame())
 o2_kennzahlen <- list("mse" = data.frame(), 
                       "mae" = data.frame(), 
-                      "rsquared" = data.frame())
+                      "rsquared" = data.frame(),
+                      "aic" = data.frame())
 kennzahlen <- list("vodafone" = vodafone_kennzahlen, 
                    "tmobile" = tmobile_kennzahlen, 
-                   "o2" = o2_kennzahlen)
+                   "o2" = o2_kennzahlen,
+                   "aic" = data.frame())
 
 # Erzeugen der Kennzahlen für die verschiedenen Provider und Testfahrten mit Zeitreihenkreuzvalidierung
 # Fahrten 3:7 jeweils Test - 1 -> 1:(test_id-1) Training
@@ -225,7 +230,7 @@ for (provider in c("vodafone", "tmobile", "o2")){
   all_mse <- data.frame(
     matrix(rep(NA, 5*nrow(grids[[provider]])), nrow = nrow(grids[[provider]])), 
     row.names = as.character(1:nrow(grids[[provider]]))  
-    # 5 Spalten (Anzahl Testsets der CV), nrow(grids[[provider]]) Zeieln (Anzahl Kombinationen) Zeilen
+    # 5 Spalten (Anzahl Testsets der CV), nrow(grids[[provider]]) Zeilen (Anzahl Kombinationen) Zeilen
   )
   colnames(all_mse) <- c(paste("test_id", as.character(3:7), sep="_"))
   # Spaltennamen: aktuelle Test Id
@@ -241,6 +246,12 @@ for (provider in c("vodafone", "tmobile", "o2")){
     row.names = as.character(1:nrow(grids[[provider]]))
   )
   colnames(all_rsquared) <- c(paste("test_id", as.character(3:7), sep="_"))
+  
+  all_aic <- data.frame(
+    matrix(rep(NA, 5*nrow(grids[[provider]])), nrow=nrow(grids[[provider]])), 
+    row.names = as.character(1:nrow(grids[[provider]]))
+  )
+  colnames(all_aic) <- c(paste("test_id", as.character(3:7), sep="_"))
   
   for (test_id in 3:7){
     
@@ -276,12 +287,16 @@ for (provider in c("vodafone", "tmobile", "o2")){
       #res <- unclass(y) - unclass(pred$mean)
       all_mse[row, paste("test_id", test_id, sep = "_")] <- mse(unclass(y), unclass(pred$mean))
       all_mae[row, paste("test_id", test_id, sep = "_")] <- mae(unclass(y), unclass(pred$mean))
-      all_rsquared[row, paste("test_id", test_id, sep = "_")] <- cor(unclass(y), unclass(pred$mean))^2
+      all_rsquared[row, paste("test_id", test_id, sep = "_")] <- sum((unclass(pred$mean)-mean(unclass(y)))^2)/sum((unclass(y)-mean(unclass(y)))^2)
+      all_aic[row, paste("test_id", test_id, sep = "_")] <- pred$model$aic
+      # cor(unclass(y), unclass(pred$mean))^2
       # yq <- mean(y.test), R2 <- sum((pred.cv-yq)^2)/sum((y.test-yq)^2)
     }
     kennzahlen[[provider]]$mse <- all_mse
     kennzahlen[[provider]]$mae <- all_mae
     kennzahlen[[provider]]$rsquared <- all_rsquared
+    kennzahlen[[provider]]$aic <- all_aic
+    
   }
 }
 
@@ -290,17 +305,20 @@ for (provider in c("vodafone", "tmobile", "o2")){
 grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mae))[[1]], ]
 grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mse))[[1]], ]
 grids[["vodafone"]][which.max(rowMeans(kennzahlen$vodafone$rsquared))[[1]], ]
-param_vodafone <- grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mae))[[1]], ]
+grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$aic))[[1]], ]
+param_vodafone <- grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$aic))[[1]], ]
 
 grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mae))[[1]], ]
 grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mse))[[1]], ]
 grids[["tmobile"]][which.max(rowMeans(kennzahlen$tmobile$rsquared))[[1]], ]
-param_tmobile <- grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mae))[[1]], ]
+grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$aic))[[1]], ]
+param_tmobile <- grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$aic))[[1]], ]
 
 grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mae))[[1]], ]
 grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mse))[[1]], ]
 grids[["o2"]][which.max(rowMeans(kennzahlen$o2$rsquared))[[1]], ]
-param_o2 <- grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mae))[[1]], ]
+grids[["o2"]][which.min(rowMeans(kennzahlen$o2$aic))[[1]], ]
+param_o2 <- grids[["o2"]][which.min(rowMeans(kennzahlen$o2$aic))[[1]], ]
 
 parameter <- list("vodafone" = param_vodafone, 
                   "tmobile" = param_tmobile, 
@@ -341,14 +359,17 @@ for (provider in c("vodafone", "tmobile", "o2")){
 
 ## Vorhersagen zurücktransformieren
 
-predictions <- lapply(predictions, function(provider) 
-  provider$mean * attr(scaled, "scaled:scale")["throughput_mbits"] + 
-    attr(scaled, "scaled:center")["throughput_mbits"]) 
+#predictions <- lapply(predictions, function(provider) 
+#  provider$mean * attr(scaled, "scaled:scale")["throughput_mbits"] + 
+#    attr(scaled, "scaled:center")["throughput_mbits"]) 
 
 ## Plot
 
 #for (provider in c("vodafone", "tmobile", "o2")){
-for (provider in c("vodafone")){
+povider <- "vodafone"
+  
+############################# Zeitreihenplot  
+  
   actual <- data.frame(
     value = ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
                     "throughput_mbits"], 
@@ -361,7 +382,7 @@ for (provider in c("vodafone")){
                        "scenario"])
   
   vorhersage <- data.frame(
-    value = predictions[[provider]], 
+    value = predictions[[provider]]$rescaled_forecast, 
     type = "predict", 
     timestamp = anytime(ul_data[(ul_data["drive_id"]==8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
                         "timestamp_ms"]),
@@ -379,7 +400,7 @@ for (provider in c("vodafone")){
   
   ggplot(
     plot_data, 
-    aes(x=timestamp, y=value, color=type)
+    aes(x = timestamp, y = value, color = type)
     ) + 
     geom_line() + 
     facet_wrap(drive_id~scenario, scales = "free", ncol = 4) + 
@@ -389,27 +410,50 @@ for (provider in c("vodafone")){
     theme(legend.title = element_blank()) +
     scale_color_hue(labels = c("Beobachtung", "Vorhersage"))
   
-#########################
+######################### Scatterplot
   
   plot_data <- data.frame(actual = actual$value, 
                           predict = vorhersage$value)
   plot_data <- cbind(plot_data, 
-        ul_data[(ul_data["drive_id"]==8 | ul_data["drive_id"]==9 | ul_data["drive_id"]==10) & ul_data["provider"] == provider, 
+        ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
                            c("drive_id", "scenario")])
   
   ggplot(
     plot_data, 
-    aes(x=actual, y=predict)
+    aes(x = actual, y = predict)
   ) + 
     geom_point() + 
-    geom_abline(color="red", intercept = 0, slope = 1) +
-    facet_wrap(drive_id~scenario, scales = "free", ncol = 4) + 
+    geom_abline(color = "red", intercept = 0, slope = 1) +
+    facet_wrap(drive_id ~ scenario, scales = "free", ncol = 4) + 
     ggtitle(paste("Scatterplot der Beobachtungen und der Vorhersagen:", name_mapping[[provider]])) + 
     xlab("Beobachtungen") + 
     ylab("Vorhersage")
-}
+#}  
+  
+######################## Barplot Vergleich Kennzahlen 
+  
+  
+df <- data.frame(provider = rep(c("vodafone", "tmobile", "o2"), each = 3),
+                 kennzahl = rep(c("MSE", "MAE", "R²"), 3),
+                 value = c(kennzahlen_final$vodafone$mse, kennzahlen_final$vodafone$mae,
+                     kennzahlen_final$vodafone$rsquared,
+                     kennzahlen_final$tmobile$mse, kennzahlen_final$tmobile$mae,
+                     kennzahlen_final$tmobile$rsquared,
+                     kennzahlen_final$o2$mse, kennzahlen_final$o2$mae,
+                     kennzahlen_final$o2$rsquared))
 
-# TODO: Zeitachse, labels
+ggplot(data = df, aes(x = kennzahl, y = value, fill = provider)) +
+  geom_bar(stat = "identity", position = position_dodge()) + 
+  facet_wrap(~ kennzahl, scales = "free") +
+  theme(legend.title = element_blank()) +
+  scale_fill_hue(labels = c("O2", "T-Mobile", "Vodafone")) + 
+  ggtitle("Vergleich der Kennzahlen der verschiedenen Provider") + 
+  xlab("Kennzahlen") + 
+  ylab("Wert") 
+  
+  
+
+
 
 
 
