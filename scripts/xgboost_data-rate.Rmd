@@ -43,56 +43,98 @@ dataset_ul = read_csv(
   rsrq_db,
   rssnr_db,
   cqi,
-  ss,
   ta,
-  ci,
   enodeb,
   f_mhz,
   payload_mb,
   throughput_mbits
 ) %>% drop_na() %>% rowid_to_column(var="row_id_original")
-
-glimpse(dataset_ul)
 ```
 
-## Create the Prediction Task
+```{r}
+dataset_ul_o2 = filter(dataset_ul, provider=="o2")
+glimpse(dataset_ul_o2)
+
+dataset_ul_tmobile = filter(dataset_ul, provider=="tmobile")
+glimpse(dataset_ul_tmobile)
+
+dataset_ul_vodafone = filter(dataset_ul, provider=="vodafone")
+glimpse(dataset_ul_vodafone)
+```
+
+## Create the Prediction Tasks for Each Provider
 
 ```{r}
-task_ul = TaskRegr$new(
-  id = "ul_prediction",
-  backend = dataset_ul %>% select(-drive_id, -timestamp),
-  target = "throughput_mbits"
-)
+make_task = function(dataset, task_id) {
+  task = TaskRegr$new(
+    id = task_id,
+    backend = dataset %>% select(-drive_id, -timestamp, -provider, -scenario),
+    target = "throughput_mbits"
+  )
+  
+  task$col_roles$name = "row_id_original"
+  task$col_roles$feature = setdiff(task$col_roles$feature, "row_id_original")
+  
+  return(task)
+}
 
-task_ul$col_roles$name = "row_id_original"
-task_ul$col_roles$feature = setdiff(task_ul$col_roles$feature, "row_id_original")
+task_ul_o2 = make_task(dataset_ul_o2, "task_ul_o2")
+task_ul_o2
 
-task_ul
+task_ul_tmobile = make_task(dataset_ul_tmobile, "task_ul_tmobile")
+task_ul_tmobile
+
+task_ul_vodafone = make_task(dataset_ul_vodafone, "task_ul_vodafone")
+task_ul_vodafone
 ```
 
 ## Create Data Splitting Strategies for Testing and Validation
 
+The outer resampling is used for the train/validation split.
 ```{r}
+get_row_ids_by_drive_ids = function(task, drive_ids) {
+  result = (tibble(task$row_names) %>% 
+    inner_join(dataset_ul, by=c("row_name"="row_id_original")) %>%
+    filter(drive_id %in% drive_ids))$row_id
+  return(result)
+}
+
 make_outer_resampling = function(task, drive_ids_train, drive_ids_test) {
-  row_ids_train = (
-    tibble(task$row_names) %>% 
-      inner_join(dataset_ul, by=c("row_name"="row_id_original")) %>% 
-      filter(drive_id %in% drive_ids_train)
-  )$row_id
-  
-  row_ids_test = (
-    tibble(task$row_names) %>% 
-      inner_join(dataset_ul, by=c("row_name"="row_id_original")) %>% 
-      filter(drive_id %in% drive_ids_test)
-  )$row_id
+  row_ids_train = get_row_ids_by_drive_ids(task, drive_ids_train)
+  row_ids_test = get_row_ids_by_drive_ids(task, drive_ids_test)
   
   result = rsmp("custom")
   result$instantiate(task, train_sets=list(row_ids_train), test_sets=list(row_ids_test))
+  
   return(result)
 }
 ```
 
-## Create the Prediction Pipeline
+The inner resampling is used for the parameter tuning on the training set.
+```{r}
+make_inner_resampling = function(task, last_drive_id) {
+  train_sets = list()
+  test_sets = list()
+  
+  for (cur_last_drive_id_train in 2:(last_drive_id-1)) {
+    drive_ids_train = 1:cur_last_drive_id_train
+    drive_ids_test = cur_last_drive_id_train + 1
+    
+    row_ids_train = get_row_ids_by_drive_ids(task, drive_ids_train)
+    row_ids_test = get_row_ids_by_drive_ids(task, drive_ids_test)
+    
+    train_sets[[length(train_sets)+1]] = row_ids_train
+    test_sets[[length(test_sets)+1]] = row_ids_test
+  }
+  
+  result = rsmp("custom")
+  result$instantiate(task, train_sets=train_sets, test_sets=test_sets)
+  
+  return(result)
+}
+```
+
+## Create the Prediction Pipeline for Each Provider
 
 ```{r}
 make_learner = function() {
@@ -106,27 +148,81 @@ make_learner = function() {
   learner = GraphLearner$new(pipe)
   return(learner)
 }
-learner_ul = make_learner()
+
+learner_ul_o2 = make_learner()
+learner_ul_tmobile = make_learner()
+learner_ul_vodafone = make_learner()
+```
+
+Here we can see the prediction pipeline:
+```{r}
+learner_ul_o2$graph$plot()
 ```
 
 ## Validation Results
 
+### Provider O2
+
 ```{r}
-resampling_result_ul = resample(
-  task = task_ul,
-  learner = learner_ul,
-  resampling = make_outer_resampling(task_ul, drive_ids_train=1:7, drive_ids_test=8:10),
+validation_result_ul_o2 = resample(
+  task = task_ul_o2,
+  learner = learner_ul_o2,
+  resampling = make_outer_resampling(task_ul_o2, drive_ids_train=1:7, drive_ids_test=8:10),
   store_models = TRUE
 )
 ```
 
 ```{r}
-resampling_result_ul$aggregate(msr("regr.rsq"))
-resampling_result_ul$aggregate(msr("regr.mae"))
+validation_result_ul_o2$aggregate(msr("regr.rsq"))
+validation_result_ul_o2$aggregate(msr("regr.mae"))
 ```
 
 ```{r}
-predictions_ul = as.data.table(resampling_result_ul$prediction())
-ggplot(predictions_ul, aes(x=truth, y=response)) +
+predictions_ul_o2 = as.data.table(validation_result_ul_o2$prediction())
+ggplot(predictions_ul_o2, aes(x=truth, y=response)) +
+  geom_point()
+```
+
+### Provider T-Mobile
+
+```{r}
+validation_result_ul_tmobile = resample(
+  task = task_ul_tmobile,
+  learner = learner_ul_tmobile,
+  resampling = make_outer_resampling(task_ul_tmobile, drive_ids_train=1:7, drive_ids_test=8:10),
+  store_models = TRUE
+)
+```
+
+```{r}
+validation_result_ul_tmobile$aggregate(msr("regr.rsq"))
+validation_result_ul_tmobile$aggregate(msr("regr.mae"))
+```
+
+```{r}
+predictions_ul_tmobile = as.data.table(validation_result_ul_tmobile$prediction())
+ggplot(predictions_ul_tmobile, aes(x=truth, y=response)) +
+  geom_point()
+```
+
+### Provider Vodafone
+
+```{r}
+validation_result_ul_vodafone = resample(
+  task = task_ul_vodafone,
+  learner = learner_ul_vodafone,
+  resampling = make_outer_resampling(task_ul_vodafone, drive_ids_train=1:7, drive_ids_test=8:10),
+  store_models = TRUE
+)
+```
+
+```{r}
+validation_result_ul_vodafone$aggregate(msr("regr.rsq"))
+validation_result_ul_vodafone$aggregate(msr("regr.mae"))
+```
+
+```{r}
+predictions_ul_vodafone = as.data.table(validation_result_ul_vodafone$prediction())
+ggplot(predictions_ul_vodafone, aes(x=truth, y=response)) +
   geom_point()
 ```
