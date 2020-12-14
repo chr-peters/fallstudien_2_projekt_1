@@ -1,4 +1,4 @@
-source("C:/Users/Alina/Documents/GitHub/fallstudien_2_projekt_1/scripts/arima_helpers.R")
+source("C:/Users/Laura/Documents/GitHub/fallstudien_2_projekt_1/scripts/arima_helpers.R")
 library(forecast)
 library(fastDummies)
 library(dplyr)
@@ -289,18 +289,18 @@ for (provider in c("vodafone", "tmobile", "o2")){
 
 grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mae))[[1]], ]
 grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mse))[[1]], ]
-grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$rsquared))[[1]], ]
-param_vodafone <- grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$rsquared))[[1]], ]
+grids[["vodafone"]][which.max(rowMeans(kennzahlen$vodafone$rsquared))[[1]], ]
+param_vodafone <- grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mae))[[1]], ]
 
 grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mae))[[1]], ]
 grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mse))[[1]], ]
-grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$rsquared))[[1]], ]
-param_tmobile <- grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$rsquared))[[1]], ]
+grids[["tmobile"]][which.max(rowMeans(kennzahlen$tmobile$rsquared))[[1]], ]
+param_tmobile <- grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mae))[[1]], ]
 
 grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mae))[[1]], ]
 grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mse))[[1]], ]
-grids[["o2"]][which.min(rowMeans(kennzahlen$o2$rsquared))[[1]], ]
-param_o2 <- grids[["o2"]][which.min(rowMeans(kennzahlen$o2$rsquared))[[1]], ]
+grids[["o2"]][which.max(rowMeans(kennzahlen$o2$rsquared))[[1]], ]
+param_o2 <- grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mae))[[1]], ]
 
 parameter <- list("vodafone" = param_vodafone, 
                   "tmobile" = param_tmobile, 
@@ -326,11 +326,17 @@ for (provider in c("vodafone", "tmobile", "o2")){
   xreg <- test[[provider]][, lm_features[-which(lm_features == "throughput_mbits")]]
   xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
   xreg <- data.matrix(xreg)
-  predictions[[provider]] <- forecast(arima_fit, xreg = xreg)
-
-  kennzahlen_final[[provider]]$mse <- mse(unclass(y), unclass(predictions[[provider]]$mean))
-  kennzahlen_final[[provider]]$mae <- mae(unclass(y), unclass(predictions[[provider]]$mean))
-  kennzahlen_final[[provider]]$rsquared <- cor(unclass(y), unclass(predictions[[provider]]$mean))^2
+  predictions[[provider]] <- forecast(arima_fit, xreg = xreg) 
+  predictions[[provider]]$rescaled_forecast <- predictions[[provider]]$mean * attr(scaled, "scaled:scale")["throughput_mbits"] + 
+    attr(scaled, "scaled:center")["throughput_mbits"]
+  predictions[[provider]]$rescaled_y <- y * attr(scaled, "scaled:scale")["throughput_mbits"] + 
+    attr(scaled, "scaled:center")["throughput_mbits"]
+  kennzahlen_final[[provider]]$mse <- mse(unclass(predictions[[provider]]$rescaled_y),
+                                          unclass(predictions[[provider]]$rescaled_forecast))
+  kennzahlen_final[[provider]]$mae <- mae(unclass(predictions[[provider]]$rescaled_y), 
+                                                  unclass(predictions[[provider]]$rescaled_forecast))
+  kennzahlen_final[[provider]]$rsquared <- cor(unclass(predictions[[provider]]$rescaled_y), 
+                                                       unclass(predictions[[provider]]$rescaled_forecast))^2
 }
 
 ## Vorhersagen zurücktransformieren
