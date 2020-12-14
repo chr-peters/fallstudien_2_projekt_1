@@ -14,6 +14,8 @@ library(ggplot2)
 library(mlr3)
 library(mlr3learners)
 library(mlr3pipelines)
+library(mlr3tuning)
+library(paradox)
 ```
 
 # Upload-Rate Prediction
@@ -137,33 +139,125 @@ make_inner_resampling = function(task, last_drive_id) {
 ## Create the Prediction Pipeline for Each Provider
 
 ```{r}
-make_learner = function() {
+make_learner = function(nrounds=100, eta=NULL, gamma=NULL, lambda=NULL) {
   factor_encoding = po(
     "encode",
     method = "one-hot",
     affect_columns = selector_type("factor")
   )
-  xgboost = lrn("regr.xgboost", nrounds=100) # default to 100 boosting rounds
+  xgboost = lrn("regr.xgboost")
+  
+  if (!is.null(nrounds)) {
+    xgboost$param_set$values = mlr3misc::insert_named(
+      xgboost$param_set$values,
+      list(nrounds=nrounds)
+    )
+  }
+  if (!is.null(eta)) {
+    xgboost$param_set$values = mlr3misc::insert_named(
+      xgboost$param_set$values,
+      list(eta=eta)
+    )
+  }
+  if (!is.null(gamma)) {
+    xgboost$param_set$values = mlr3misc::insert_named(
+      xgboost$param_set$values,
+      list(gamma=gamma)
+    )
+  }
+  if (!is.null(lambda)) {
+    xgboost$param_set$values = mlr3misc::insert_named(
+      xgboost$param_set$values,
+      list(lambda=lambda)
+    )
+  }
+  
   pipe = factor_encoding %>>% PipeOpLearner$new(xgboost)
   learner = GraphLearner$new(pipe)
   return(learner)
 }
-
-learner_ul_o2 = make_learner()
-learner_ul_tmobile = make_learner()
-learner_ul_vodafone = make_learner()
 ```
 
 Here we can see the prediction pipeline:
 ```{r}
-learner_ul_o2$graph$plot()
+make_learner()$graph$plot()
+```
+
+## Parameter Tuning
+
+```{r}
+parameter_space = ParamSet$new(list(
+  ParamInt$new("regr.xgboost.nrounds", lower=100, upper=1000),
+  ParamDbl$new("regr.xgboost.eta", lower=0.01, upper=1),
+  ParamDbl$new("regr.xgboost.gamma", lower=0, upper=10),
+  ParamDbl$new("regr.xgboost.lambda", lower=0, upper=10)
+))
+```
+
+```{r}
+get_tuning_result = function(task, grid_resolution, n_evals) {
+  tuning_instance = TuningInstanceSingleCrit$new(
+    task = task,
+    learner = make_learner(),
+    resampling = make_inner_resampling(task, last_drive_id=7),
+    measure = msr("regr.mae"),
+    terminator = trm("evals", n_evals=n_evals),
+    search_space = parameter_space,
+    store_benchmark_result = TRUE,
+    check_values = TRUE
+  )
+  
+  tuner = tnr("grid_search", resolution = grid_resolution)
+  tuner$optimize(tuning_instance)
+  
+  return(tuning_instance)
+}
+```
+
+```{r, results = "hide"}
+tuning_result_o2 = get_tuning_result(task_ul_o2, grid_resolution = 20, n_evals = 10)
+
+tuning_result_tmobile = get_tuning_result(task_ul_tmobile, grid_resolution = 20, n_evals = 10)
+
+tuning_result_vodafone = get_tuning_result(task_ul_vodafone, grid_resolution = 20, n_evals = 10)
+```
+
+```{r}
+tuning_result_o2$result
+tuning_result_tmobile$result
+tuning_result_vodafone$result
+```
+
+## Create Learners with Tuned Hyperparameters
+
+```{r}
+learner_ul_o2 = make_learner(
+  nrounds = tuning_result_o2$result$regr.xgboost.nrounds,
+  eta = tuning_result_o2$result$regr.xgboost.eta,
+  gamma = tuning_result_o2$result$regr.xgboost.gamma,
+  lambda = tuning_result_o2$result$regr.xgboost.lambda
+)
+
+learner_ul_tmobile = make_learner(
+  nrounds = tuning_result_tmobile$result$regr.xgboost.nrounds,
+  eta = tuning_result_tmobile$result$regr.xgboost.eta,
+  gamma = tuning_result_tmobile$result$regr.xgboost.gamma,
+  lambda = tuning_result_tmobile$result$regr.xgboost.lambda
+)
+
+learner_ul_vodafone = make_learner(
+  nrounds = tuning_result_vodafone$result$regr.xgboost.nrounds,
+  eta = tuning_result_vodafone$result$regr.xgboost.eta,
+  gamma = tuning_result_vodafone$result$regr.xgboost.gamma,
+  lambda = tuning_result_vodafone$result$regr.xgboost.lambda
+)
 ```
 
 ## Validation Results
 
 ### Provider O2
 
-```{r}
+```{r, results = "hide"}
 validation_result_ul_o2 = resample(
   task = task_ul_o2,
   learner = learner_ul_o2,
@@ -185,7 +279,7 @@ ggplot(predictions_ul_o2, aes(x=truth, y=response)) +
 
 ### Provider T-Mobile
 
-```{r}
+```{r, results = "hide"}
 validation_result_ul_tmobile = resample(
   task = task_ul_tmobile,
   learner = learner_ul_tmobile,
@@ -207,7 +301,7 @@ ggplot(predictions_ul_tmobile, aes(x=truth, y=response)) +
 
 ### Provider Vodafone
 
-```{r}
+```{r, results = "hide"}
 validation_result_ul_vodafone = resample(
   task = task_ul_vodafone,
   learner = learner_ul_vodafone,
