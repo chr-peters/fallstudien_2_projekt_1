@@ -508,7 +508,7 @@ ggplot(importance_ul) +
   xlab("feature") +
   ylab("Gain") +
   scale_x_discrete(guide = guide_axis(angle = 20)) +
-  ggtitle("XGBoost Gain Feature Importance")
+  ggtitle("Upload-Rate XGBoost Gain Feature Importance")
 ```
 
 ### Permutation
@@ -760,4 +760,38 @@ ggplot(filter(validation_results_dl, provider=="vodafone"), aes(x=truth, y=respo
   xlab("Measured Data Rate [MBit/s]") +
   ylab("Predicted Data Rate [MBit/s]") +
   ggtitle("Download-Rate Predictions for Provider Vodafone")
+```
+
+## Feature Importance
+
+### XGBoost Gain
+
+```{r}
+importance_dl_o2 = tibble(xgboost::xgb.importance(
+  feature_names = resampling_result_dl_o2$learners[[1]]$model$regr.xgboost$model$feature_names,
+  model = resampling_result_dl_o2$learners[[1]]$model$regr.xgboost$model
+)) %>% mutate(provider = "o2")
+importance_dl_tmobile = tibble(xgboost::xgb.importance(
+  feature_names = resampling_result_dl_tmobile$learners[[1]]$model$regr.xgboost$model$feature_names,
+  model = resampling_result_dl_tmobile$learners[[1]]$model$regr.xgboost$model
+)) %>% mutate(provider = "tmobile")
+importance_dl_vodafone = tibble(xgboost::xgb.importance(
+  feature_names = resampling_result_dl_vodafone$learners[[1]]$model$regr.xgboost$model$feature_names,
+  model = resampling_result_dl_vodafone$learners[[1]]$model$regr.xgboost$model
+)) %>% mutate(provider = "vodafone")
+
+importance_dl = bind_rows(
+  importance_dl_o2,
+  importance_dl_tmobile,
+  importance_dl_vodafone
+) %>% filter(!str_starts(Feature, "enodeb"))
+```
+
+```{r}
+ggplot(importance_dl) +
+  geom_bar(position = "dodge", aes(x = Feature, y = Gain, fill = provider), stat="identity") +
+  xlab("feature") +
+  ylab("Gain") +
+  scale_x_discrete(guide = guide_axis(angle = 20)) +
+  ggtitle("Download-Rate XGBoost Gain Feature Importance")
 ```
