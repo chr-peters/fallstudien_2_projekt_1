@@ -362,7 +362,7 @@ for (provider in c("vodafone", "tmobile", "o2")){
 
 ## Plot
 
-provider <- "o2"
+provider <- "tmobile"
   
 ############################# Zeitreihenplot  
   
@@ -375,7 +375,11 @@ actual <- data.frame(
   drive_id = dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                      "drive_id"], 
   scenario = dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
-                     "scenario"])
+                     "scenario"],
+  upper = unclass(predictions[[provider]]$upper[,"80%"] * attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
+                    attr(train[[provider]], "scaled:center")["throughput_mbits"]),
+  lower = unclass(predictions[[provider]]$lower[,"80%"] * attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
+                    attr(train[[provider]], "scaled:center")["throughput_mbits"]))
 
 vorhersage <- data.frame(
   value = predictions[[provider]]$rescaled_forecast, 
@@ -385,7 +389,11 @@ vorhersage <- data.frame(
   drive_id = dl_data[(dl_data["drive_id"]==8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                      "drive_id"], 
   scenario = dl_data[(dl_data["drive_id"]==8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
-                     "scenario"])
+                     "scenario"],
+  upper = unclass(predictions[[provider]]$upper[,"80%"])* attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
+    attr(train[[provider]], "scaled:center")["throughput_mbits"],
+  lower = unclass(predictions[[provider]]$lower[,"80%"])* attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
+    attr(train[[provider]], "scaled:center")["throughput_mbits"])
 plot_data <- rbind(actual, vorhersage)
 
 name_mapping = list(
@@ -397,14 +405,20 @@ name_mapping = list(
 ggplot(
   plot_data, 
   aes(x = timestamp, y = value, color = type)
-) + 
-  geom_line() + 
-  facet_wrap(drive_id~scenario, scales = "free", ncol = 4) + 
-  ggtitle(name_mapping[[provider]], "- Downlink") + 
+  ) + 
+  geom_line(size=1) + 
+  geom_ribbon(aes(ymin = lower, ymax = upper), colour = NA, alpha = 0.2) +
+  facet_wrap(drive_id~scenario, 
+             scales = "free", 
+             ncol = 4, 
+             labeller = label_wrap_gen(multi_line=FALSE)) + 
+  ggtitle(paste(name_mapping[[provider]], "- Downlink", sep = " ")) + 
   xlab("Zeit") + 
   ylab("Datenübertragungsrate in MBit/s") +
-  theme(legend.title = element_blank()) +
-  scale_color_hue(labels = c("Beobachtung", "Vorhersage"))
+  theme_grey(base_size = 14) +
+  theme(legend.position="bottom", 
+        legend.title = element_blank()) +
+  scale_color_hue(labels = c("Beobachtung", "Vorhersage mit 80% KI"))
   
 ######################### Scatterplot
   
@@ -420,11 +434,15 @@ ggplot(
 ) + 
   geom_point() + 
   geom_abline(color = "red", intercept = 0, slope = 1) +
-  facet_wrap(drive_id ~ scenario, scales = "free", ncol = 4) + 
-  ggtitle(paste("Scatterplot der Beobachtungen und der Vorhersagen:", name_mapping[[provider]]), "- Downlink") + 
+  facet_wrap(drive_id ~ scenario, 
+             scales = "free", 
+             ncol = 4, 
+             labeller = label_wrap_gen(multi_line=FALSE)) + 
+  ggtitle(paste("Scatterplot der Beobachtungen und der Vorhersagen:", name_mapping[[provider]], "- Downlink")) + 
   xlab("Beobachtungen") + 
-  ylab("Vorhersage")
-  
+  ylab("Vorhersage") +
+  theme_grey(base_size = 14)
+
 ######################## Barplot Vergleich Kennzahlen 
   
   
@@ -440,12 +458,14 @@ df <- data.frame(provider = rep(c("vodafone", "tmobile", "o2"), each = 3),
 ggplot(data = df, aes(x = kennzahl, y = value, fill = provider)) +
   geom_bar(stat = "identity", position = position_dodge()) + 
   facet_wrap(~ kennzahl, scales = "free") +
-  theme(legend.title = element_blank()) +
+  theme_grey(base_size = 18) +
+  theme(legend.title = element_blank(), 
+        legend.position = "bottom") +
   scale_fill_hue(labels = c("O2", "T-Mobile", "Vodafone")) + 
   ggtitle("Vergleich der Kennzahlen der verschiedenen Provider - Downlink") + 
   xlab("Kennzahlen") + 
-  ylab("Wert") 
-  
+  ylab("Wert")
+
   
 # TODO: Warum schlägt der MSE und MAE bei o2 so aus?
 
