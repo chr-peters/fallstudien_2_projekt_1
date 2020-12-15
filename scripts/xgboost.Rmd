@@ -78,11 +78,11 @@ glimpse(dataset_ul_vodafone)
 ## Create the Prediction Tasks for Each Provider
 
 ```{r}
-make_task = function(dataset, task_id) {
+make_task = function(dataset, task_id, target="throughput_mbits") {
   task = TaskRegr$new(
     id = task_id,
     backend = dataset %>% select(-drive_id, -timestamp, -provider, -scenario),
-    target = "throughput_mbits"
+    target = target
   )
   
   task$col_roles$name = "row_id_original"
@@ -384,7 +384,7 @@ ggplot(importance_ul) +
   xlab("feature") +
   ylab("Gain") +
   scale_x_discrete(guide = guide_axis(angle = 20)) +
-  ggtitle("Upload-Rate XGBoost Gain Feature Importance")
+  ggtitle("XGBoost Gain Feature Importance for Upload-Rate Prediction")
 ```
 
 ### Permutation
@@ -456,7 +456,7 @@ ggplot(permutation_ul) +
   xlab("feature") +
   ylab("MAE difference") +
   scale_x_discrete(guide = guide_axis(angle = 20)) +
-  ggtitle("Permutation Feature Importance")
+  ggtitle("Permutation Feature Importance for Upload-Rate Prediction")
 ```
 
 
@@ -677,7 +677,7 @@ ggplot(importance_dl) +
   xlab("feature") +
   ylab("Gain") +
   scale_x_discrete(guide = guide_axis(angle = 20)) +
-  ggtitle("Download-Rate XGBoost Gain Feature Importance")
+  ggtitle("XGBoost Gain Feature Importance for Download-Rate Prediction")
 ```
 
 ### Permutation
@@ -734,5 +734,285 @@ ggplot(permutation_dl) +
   xlab("feature") +
   ylab("MAE difference") +
   scale_x_discrete(guide = guide_axis(angle = 20)) +
-  ggtitle("Permutation Feature Importance")
+  ggtitle("Permutation Feature Importance for Download-Rate Prediction")
+```
+
+
+# Link Lifetime Prediction
+
+## Reading the Data
+
+```{r}
+dataset_linklifetime = read_csv(
+  str_c(data_dir, "dataset_context.csv"), 
+  col_types = cols(
+    drive_id = col_integer(),
+    scenario = col_factor(), 
+    provider = col_factor(), 
+    ci = col_factor(), 
+    enodeb = col_factor()
+  )
+) %>% select(
+  drive_id,
+  timestamp,
+  scenario,
+  provider,
+  velocity_mps,
+  rsrp_dbm,
+  rsrq_db,
+  rssnr_db,
+  cqi,
+  ta,
+  enodeb,
+  rsrp_neighbor,
+  rsrq_neighbor,
+  link_lifetime
+) %>% drop_na() %>% rowid_to_column(var="row_id_original")
+```
+
+```{r}
+dataset_linklifetime_o2 = filter(dataset_linklifetime, provider=="o2")
+glimpse(dataset_linklifetime_o2)
+
+dataset_linklifetime_tmobile = filter(dataset_linklifetime, provider=="tmobile")
+glimpse(dataset_linklifetime_tmobile)
+
+dataset_linklifetime_vodafone = filter(dataset_linklifetime, provider=="vodafone")
+glimpse(dataset_linklifetime_vodafone)
+```
+
+## Create the Prediction Tasks for Each Provider
+
+```{r}
+task_linklifetime_o2 = make_task(dataset_linklifetime_o2, "task_linklifetime_o2", target = "link_lifetime")
+task_linklifetime_o2
+
+task_linklifetime_tmobile = make_task(dataset_linklifetime_tmobile, "task_linklifetime_tmobile", target = "link_lifetime")
+task_linklifetime_tmobile
+
+task_linklifetime_vodafone = make_task(dataset_linklifetime_vodafone, "task_linklifetime_vodafone", target = "link_lifetime")
+task_linklifetime_vodafone
+```
+
+## Parameter Tuning
+
+```{r, results = "hide"}
+tuning_result_linklifetime_o2 = get_tuning_result(task_linklifetime_o2, dataset_linklifetime, grid_resolution = 20, n_evals = 10)
+
+tuning_result_linklifetime_tmobile = get_tuning_result(task_linklifetime_tmobile, dataset_linklifetime, grid_resolution = 20, n_evals = 10)
+
+tuning_result_linklifetime_vodafone = get_tuning_result(task_linklifetime_vodafone, dataset_linklifetime, grid_resolution = 20, n_evals = 10)
+```
+
+```{r}
+tuning_result_linklifetime = bind_rows(
+  tibble(tuning_result_linklifetime_o2$result) %>% mutate(provider="o2"),
+  tibble(tuning_result_linklifetime_tmobile$result) %>% mutate(provider="tmobile"),
+  tibble(tuning_result_linklifetime_vodafone$result) %>% mutate(provider="vodafone"),
+) %>% select("provider", "regr.xgboost.nrounds", "regr.xgboost.eta", "regr.xgboost.gamma", "regr.xgboost.lambda")
+
+knitr::kable(tuning_result_linklifetime)
+```
+
+## Create Learners with Tuned Hyperparameters
+
+```{r}
+learner_linklifetime_o2 = make_learner(
+  nrounds = tuning_result_linklifetime_o2$result$regr.xgboost.nrounds,
+  eta = tuning_result_linklifetime_o2$result$regr.xgboost.eta,
+  gamma = tuning_result_linklifetime_o2$result$regr.xgboost.gamma,
+  lambda = tuning_result_linklifetime_o2$result$regr.xgboost.lambda
+)
+
+learner_linklifetime_tmobile = make_learner(
+  nrounds = tuning_result_linklifetime_tmobile$result$regr.xgboost.nrounds,
+  eta = tuning_result_linklifetime_tmobile$result$regr.xgboost.eta,
+  gamma = tuning_result_linklifetime_tmobile$result$regr.xgboost.gamma,
+  lambda = tuning_result_linklifetime_tmobile$result$regr.xgboost.lambda
+)
+
+learner_linklifetime_vodafone = make_learner(
+  nrounds = tuning_result_linklifetime_vodafone$result$regr.xgboost.nrounds,
+  eta = tuning_result_linklifetime_vodafone$result$regr.xgboost.eta,
+  gamma = tuning_result_linklifetime_vodafone$result$regr.xgboost.gamma,
+  lambda = tuning_result_linklifetime_vodafone$result$regr.xgboost.lambda
+)
+```
+
+## Validation Results
+
+```{r, results = "hide"}
+resampling_result_linklifetime_o2 = resample(
+  task = task_linklifetime_o2,
+  learner = learner_linklifetime_o2,
+  resampling = make_outer_resampling(task_linklifetime_o2, dataset_linklifetime, drive_ids_train=1:7, drive_ids_test=8:10),
+  store_models = TRUE
+)
+
+resampling_result_linklifetime_tmobile = resample(
+  task = task_linklifetime_tmobile,
+  learner = learner_linklifetime_tmobile,
+  resampling = make_outer_resampling(task_linklifetime_tmobile, dataset_linklifetime, drive_ids_train=1:7, drive_ids_test=8:10),
+  store_models = TRUE
+)
+
+resampling_result_linklifetime_vodafone = resample(
+  task = task_linklifetime_vodafone,
+  learner = learner_linklifetime_vodafone,
+  resampling = make_outer_resampling(task_linklifetime_vodafone, dataset_linklifetime, drive_ids_train=1:7, drive_ids_test=8:10),
+  store_models = TRUE
+)
+```
+
+```{r}
+predictions_linklifetime_o2 = as.data.table(resampling_result_linklifetime_o2$prediction())
+glimpse(tibble(predictions_linklifetime_o2))
+predictions_linklifetime_tmobile = as.data.table(resampling_result_linklifetime_tmobile$prediction())
+predictions_linklifetime_vodafone = as.data.table(resampling_result_linklifetime_vodafone$prediction())
+```
+
+```{r}
+validation_results_linklifetime = bind_rows(
+  tibble(predictions_linklifetime_o2) %>% 
+    inner_join(tibble(task_linklifetime_o2$row_names), by="row_id") %>% 
+    inner_join(dataset_linklifetime, by=c("row_name"="row_id_original")),
+  tibble(predictions_linklifetime_tmobile) %>% 
+    inner_join(tibble(task_linklifetime_tmobile$row_names), by="row_id") %>% 
+    inner_join(dataset_linklifetime, by=c("row_name"="row_id_original")),
+  tibble(predictions_linklifetime_vodafone) %>% 
+    inner_join(tibble(task_linklifetime_vodafone$row_names), by="row_id") %>% 
+    inner_join(dataset_linklifetime, by=c("row_name"="row_id_original"))
+)
+glimpse(validation_results_linklifetime)
+```
+
+```{r}
+all(validation_results_linklifetime$truth == validation_results_linklifetime$link_lifetime)
+```
+
+```{r}
+validation_results_linklifetime = validation_results_linklifetime %>% 
+  rename(prediction_xgboost=response) %>% 
+  select(-truth, -row_id, -row_name)
+
+# write_csv(validation_results_linklifetime, str_c(results_dir, "predictions_xgboost_linklifetime.csv"))
+```
+
+### Scatter Plots
+
+```{r}
+ggplot(filter(validation_results_linklifetime, provider=="o2"), aes(x=link_lifetime, y=prediction_xgboost)) +
+  geom_point(aes(color=scenario, shape=scenario)) +
+  xlab("Measured Link-Lifetime [s]") +
+  ylab("Predicted Link-Lifetime [s]") +
+  ggtitle("Link-Lifetime Predictions for Provider O2")
+```
+
+```{r}
+ggplot(filter(validation_results_linklifetime, provider=="tmobile"), aes(x=link_lifetime, y=prediction_xgboost)) +
+  geom_point(aes(color=scenario, shape=scenario)) +
+  xlab("Measured Link-Lifetime [s]") +
+  ylab("Predicted Link-Lifetime [s]") +
+  ggtitle("Link-Lifetime Predictions for Provider T-Mobile")
+```
+
+```{r}
+ggplot(filter(validation_results_linklifetime, provider=="vodafone"), aes(x=link_lifetime, y=prediction_xgboost)) +
+  geom_point(aes(color=scenario, shape=scenario)) +
+  xlab("Measured Link-Lifetime [s]") +
+  ylab("Predicted Link-Lifetime [s]") +
+  ggtitle("Link-Lifetime Predictions for Provider Vodafone")
+```
+
+## Feature Importance
+
+### XGBoost Gain
+
+```{r}
+importance_linklifetime_o2 = tibble(xgboost::xgb.importance(
+  feature_names = resampling_result_linklifetime_o2$learners[[1]]$model$regr.xgboost$model$feature_names,
+  model = resampling_result_linklifetime_o2$learners[[1]]$model$regr.xgboost$model
+)) %>% mutate(provider = "o2")
+
+importance_linklifetime_tmobile = tibble(xgboost::xgb.importance(
+  feature_names = resampling_result_linklifetime_tmobile$learners[[1]]$model$regr.xgboost$model$feature_names,
+  model = resampling_result_linklifetime_tmobile$learners[[1]]$model$regr.xgboost$model
+)) %>% mutate(provider = "tmobile")
+
+importance_linklifetime_vodafone = tibble(xgboost::xgb.importance(
+  feature_names = resampling_result_linklifetime_vodafone$learners[[1]]$model$regr.xgboost$model$feature_names,
+  model = resampling_result_linklifetime_vodafone$learners[[1]]$model$regr.xgboost$model
+)) %>% mutate(provider = "vodafone")
+
+importance_linklifetime = bind_rows(
+  importance_linklifetime_o2,
+  importance_linklifetime_tmobile,
+  importance_linklifetime_vodafone
+) %>% filter(!str_starts(Feature, "enodeb"))
+```
+
+```{r}
+ggplot(importance_linklifetime) +
+  geom_bar(position = "dodge", aes(x = Feature, y = Gain, fill = provider), stat="identity") +
+  xlab("feature") +
+  ylab("Gain") +
+  scale_x_discrete(guide = guide_axis(angle = 20)) +
+  ggtitle("XGBoost Gain Feature Importance for Link-Lifetime Prediction")
+```
+
+### Permutation
+
+```{r, results='hide'}
+num_permutation_sims_linklifetime = 1
+
+filter_permutation_o2_linklifetime = flt("permutation",
+  learner = learner_linklifetime_o2$clone(),
+  resampling = uninstantiate_resampling(
+    make_outer_resampling(task_linklifetime_o2, dataset_linklifetime, drive_ids_train=1:7, drive_ids_test=8:10)
+  ),
+  measure = msr("regr.mae"),
+  standardize = TRUE,
+  nmc = num_permutation_sims_linklifetime
+)
+filter_permutation_o2_linklifetime$calculate(task_linklifetime_o2)
+permutation_linklifetime_o2 = tibble(as.data.table(filter_permutation_o2_linklifetime)) %>% mutate(provider="o2")
+
+filter_permutation_tmobile_linklifetime = flt("permutation",
+  learner = learner_linklifetime_tmobile$clone(),
+  resampling = uninstantiate_resampling(
+    make_outer_resampling(task_linklifetime_tmobile, dataset_linklifetime, drive_ids_train=1:7, drive_ids_test=8:10)
+  ),
+  measure = msr("regr.mae"),
+  standardize = TRUE,
+  nmc = num_permutation_sims_linklifetime
+)
+filter_permutation_tmobile_linklifetime$calculate(task_linklifetime_tmobile)
+permutation_linklifetime_tmobile = tibble(as.data.table(filter_permutation_tmobile_linklifetime)) %>% mutate(provider="tmobile")
+
+filter_permutation_vodafone_linklifetime = flt("permutation",
+  learner = learner_linklifetime_vodafone$clone(),
+  resampling = uninstantiate_resampling(
+    make_outer_resampling(task_linklifetime_vodafone, dataset_linklifetime, drive_ids_train=1:7, drive_ids_test=8:10)
+  ),
+  measure = msr("regr.mae"),
+  standardize = TRUE,
+  nmc = num_permutation_sims_linklifetime
+)
+filter_permutation_vodafone_linklifetime$calculate(task_linklifetime_vodafone)
+permutation_linklifetime_vodafone = tibble(as.data.table(filter_permutation_vodafone_linklifetime)) %>% mutate(provider="vodafone")
+
+permutation_linklifetime = bind_rows(
+  permutation_linklifetime_o2,
+  permutation_linklifetime_tmobile,
+  permutation_linklifetime_vodafone
+)
+```
+
+```{r}
+ggplot(permutation_linklifetime) +
+  geom_bar(position = "dodge", aes(x = feature, y = score, fill = provider), stat="identity") +
+  xlab("feature") +
+  ylab("MAE difference") +
+  scale_x_discrete(guide = guide_axis(angle = 20)) +
+  ggtitle("Permutation Feature Importance for Link-Lifetime Prediction")
 ```
