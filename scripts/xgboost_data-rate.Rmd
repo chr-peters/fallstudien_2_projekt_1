@@ -1,6 +1,10 @@
 ---
-title: "xgboost Data-Rate Prediction"
-output: pdf_document
+title: "XGBoost"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
@@ -99,16 +103,16 @@ task_ul_vodafone
 
 The outer resampling is used for the train/validation split.
 ```{r}
-get_row_ids_by_drive_ids = function(task, drive_ids) {
+get_row_ids_by_drive_ids = function(task, dataset, drive_ids) {
   result = (tibble(task$row_names) %>% 
-    inner_join(dataset_ul, by=c("row_name"="row_id_original")) %>%
+    inner_join(dataset, by=c("row_name"="row_id_original")) %>%
     filter(drive_id %in% drive_ids))$row_id
   return(result)
 }
 
-make_outer_resampling = function(task, drive_ids_train, drive_ids_test) {
-  row_ids_train = get_row_ids_by_drive_ids(task, drive_ids_train)
-  row_ids_test = get_row_ids_by_drive_ids(task, drive_ids_test)
+make_outer_resampling = function(task, dataset, drive_ids_train, drive_ids_test) {
+  row_ids_train = get_row_ids_by_drive_ids(task, dataset, drive_ids_train)
+  row_ids_test = get_row_ids_by_drive_ids(task, dataset, drive_ids_test)
   
   result = rsmp("custom")
   result$instantiate(task, train_sets=list(row_ids_train), test_sets=list(row_ids_test))
@@ -119,7 +123,7 @@ make_outer_resampling = function(task, drive_ids_train, drive_ids_test) {
 
 The inner resampling is used for the parameter tuning on the training set.
 ```{r}
-make_inner_resampling = function(task, last_drive_id) {
+make_inner_resampling = function(task, dataset, last_drive_id) {
   train_sets = list()
   test_sets = list()
   
@@ -127,8 +131,8 @@ make_inner_resampling = function(task, last_drive_id) {
     drive_ids_train = 1:cur_last_drive_id_train
     drive_ids_test = cur_last_drive_id_train + 1
     
-    row_ids_train = get_row_ids_by_drive_ids(task, drive_ids_train)
-    row_ids_test = get_row_ids_by_drive_ids(task, drive_ids_test)
+    row_ids_train = get_row_ids_by_drive_ids(task, dataset, drive_ids_train)
+    row_ids_test = get_row_ids_by_drive_ids(task, dataset, drive_ids_test)
     
     train_sets[[length(train_sets)+1]] = row_ids_train
     test_sets[[length(test_sets)+1]] = row_ids_test
@@ -141,7 +145,7 @@ make_inner_resampling = function(task, last_drive_id) {
 }
 ```
 
-## Create the Prediction Pipeline for Each Provider
+## Create the Prediction Pipeline
 
 ```{r}
 make_learner = function(nrounds=100, eta=NULL, gamma=NULL, lambda=NULL) {
@@ -200,14 +204,14 @@ parameter_space = ParamSet$new(list(
 ```
 
 ```{r}
-get_tuning_result = function(task, grid_resolution, n_evals) {
+get_tuning_result = function(task, dataset, grid_resolution, n_evals) {
   tuning_instance = TuningInstanceSingleCrit$new(
     task = task,
     learner = make_learner(),
-    resampling = make_inner_resampling(task, last_drive_id=7),
+    resampling = make_inner_resampling(task, dataset, last_drive_id=7),
     measure = msr("regr.mae"),
     terminator = trm("evals", n_evals=n_evals),
-    search_space = parameter_space,
+    search_space = parameter_space$clone(deep = TRUE),
     store_benchmark_result = TRUE,
     check_values = TRUE
   )
@@ -220,11 +224,11 @@ get_tuning_result = function(task, grid_resolution, n_evals) {
 ```
 
 ```{r, results = "hide"}
-tuning_result_o2 = get_tuning_result(task_ul_o2, grid_resolution = 20, n_evals = 10)
+tuning_result_o2 = get_tuning_result(task_ul_o2, dataset_ul, grid_resolution = 20, n_evals = 10)
 
-tuning_result_tmobile = get_tuning_result(task_ul_tmobile, grid_resolution = 20, n_evals = 10)
+tuning_result_tmobile = get_tuning_result(task_ul_tmobile, dataset_ul, grid_resolution = 20, n_evals = 10)
 
-tuning_result_vodafone = get_tuning_result(task_ul_vodafone, grid_resolution = 20, n_evals = 10)
+tuning_result_vodafone = get_tuning_result(task_ul_vodafone, dataset_ul, grid_resolution = 20, n_evals = 10)
 ```
 
 ```{r}
@@ -264,21 +268,21 @@ learner_ul_vodafone = make_learner(
 resampling_result_ul_o2 = resample(
   task = task_ul_o2,
   learner = learner_ul_o2,
-  resampling = make_outer_resampling(task_ul_o2, drive_ids_train=1:7, drive_ids_test=8:10),
+  resampling = make_outer_resampling(task_ul_o2, dataset_ul, drive_ids_train=1:7, drive_ids_test=8:10),
   store_models = TRUE
 )
 
 resampling_result_ul_tmobile = resample(
   task = task_ul_tmobile,
   learner = learner_ul_tmobile,
-  resampling = make_outer_resampling(task_ul_tmobile, drive_ids_train=1:7, drive_ids_test=8:10),
+  resampling = make_outer_resampling(task_ul_tmobile, dataset_ul, drive_ids_train=1:7, drive_ids_test=8:10),
   store_models = TRUE
 )
 
 resampling_result_ul_vodafone = resample(
   task = task_ul_vodafone,
   learner = learner_ul_vodafone,
-  resampling = make_outer_resampling(task_ul_vodafone, drive_ids_train=1:7, drive_ids_test=8:10),
+  resampling = make_outer_resampling(task_ul_vodafone, dataset_ul, drive_ids_train=1:7, drive_ids_test=8:10),
   store_models = TRUE
 )
 ```
@@ -314,19 +318,25 @@ all(validation_results_ul$truth == validation_results_ul$throughput_mbits)
 ```{r}
 ggplot(filter(validation_results_ul, provider=="o2"), aes(x=truth, y=response)) +
   geom_point(aes(color=scenario, shape=scenario)) +
-  ggtitle("Predictions for Provider O2")
+  xlab("Measured Data Rate [MBit/s]") +
+  ylab("Predicted Data Rate [MBit/s]") +
+  ggtitle("Upload-Rate Predictions for Provider O2")
 ```
 
 ```{r}
 ggplot(filter(validation_results_ul, provider=="tmobile"), aes(x=truth, y=response)) +
   geom_point(aes(color=scenario, shape=scenario)) +
-  ggtitle("Predictions for Provider T-Mobile")
+  xlab("Measured Data Rate [MBit/s]") +
+  ylab("Predicted Data Rate [MBit/s]") +
+  ggtitle("Upload-Rate Predictions for Provider T-Mobile")
 ```
 
 ```{r}
 ggplot(filter(validation_results_ul, provider=="vodafone"), aes(x=truth, y=response)) +
   geom_point(aes(color=scenario, shape=scenario)) +
-  ggtitle("Predictions for Provider Vodafone")
+  xlab("Measured Data Rate [MBit/s]") +
+  ylab("Predicted Data Rate [MBit/s]") +
+  ggtitle("Upload-Rate Predictions for Provider Vodafone")
 ```
 
 ### Performance Measures
@@ -469,11 +479,45 @@ ggplot(results_by_provider_and_scenario, aes(x=scenario, y=mae, fill=provider)) 
 
 ## Feature Importance
 
+### XGBoost Gain
+
+```{r}
+importance_ul_o2 = tibble(xgboost::xgb.importance(
+  feature_names = resampling_result_ul_o2$learners[[1]]$model$regr.xgboost$model$feature_names,
+  model = resampling_result_ul_o2$learners[[1]]$model$regr.xgboost$model
+)) %>% mutate(provider = "o2")
+importance_ul_tmobile = tibble(xgboost::xgb.importance(
+  feature_names = resampling_result_ul_tmobile$learners[[1]]$model$regr.xgboost$model$feature_names,
+  model = resampling_result_ul_tmobile$learners[[1]]$model$regr.xgboost$model
+)) %>% mutate(provider = "tmobile")
+importance_ul_vodafone = tibble(xgboost::xgb.importance(
+  feature_names = resampling_result_ul_vodafone$learners[[1]]$model$regr.xgboost$model$feature_names,
+  model = resampling_result_ul_vodafone$learners[[1]]$model$regr.xgboost$model
+)) %>% mutate(provider = "vodafone")
+
+importance_ul = bind_rows(
+  importance_ul_o2,
+  importance_ul_tmobile,
+  importance_ul_vodafone
+) %>% filter(!str_starts(Feature, "enodeb"))
+```
+
+```{r}
+ggplot(importance_ul) +
+  geom_bar(position = "dodge", aes(x = Feature, y = Gain, fill = provider), stat="identity") +
+  xlab("feature") +
+  ylab("Gain") +
+  scale_x_discrete(guide = guide_axis(angle = 20)) +
+  ggtitle("XGBoost Gain Feature Importance")
+```
+
+### Permutation
+
 ```{r}
 uninstantiate_resampling = function(resampling) {
   new_resampling = new.env()
   class(new_resampling) = class(resampling)
-  for (val in ls(resampling)) {
+  for (val in ls(resampling, all.names = TRUE)) {
     if (val != "is_instantiated") {
       assign(val, get(val, envir=resampling), envir = new_resampling)
     }
@@ -484,27 +528,236 @@ uninstantiate_resampling = function(resampling) {
 }
 ```
 
-### Provider O2
-
 ```{r, results='hide'}
+num_permutation_sims_ul = 1
+
 filter_permutation_o2 = flt("permutation",
-  learner = make_learner(),
+  learner = learner_ul_o2$clone(),
   resampling = uninstantiate_resampling(
-    make_outer_resampling(task_ul_o2, drive_ids_train=1:7, drive_ids_test=8:10)
+    make_outer_resampling(task_ul_o2, dataset_ul, drive_ids_train=1:7, drive_ids_test=8:10)
   ),
   measure = msr("regr.mae"),
   standardize = TRUE,
-  nmc=10
+  nmc=num_permutation_sims_ul
 )
 filter_permutation_o2$calculate(task_ul_o2)
-permutation_results_o2 = as.data.table(filter_permutation_o2)
+permutation_ul_o2 = tibble(as.data.table(filter_permutation_o2)) %>% mutate(provider="o2")
+
+filter_permutation_tmobile = flt("permutation",
+  learner = learner_ul_tmobile$clone(),
+  resampling = uninstantiate_resampling(
+    make_outer_resampling(task_ul_tmobile, dataset_ul, drive_ids_train=1:7, drive_ids_test=8:10)
+  ),
+  measure = msr("regr.mae"),
+  standardize = TRUE,
+  nmc=num_permutation_sims_ul
+)
+filter_permutation_tmobile$calculate(task_ul_tmobile)
+permutation_ul_tmobile = tibble(as.data.table(filter_permutation_tmobile)) %>% mutate(provider="tmobile")
+
+filter_permutation_vodafone = flt("permutation",
+  learner = learner_ul_vodafone$clone(),
+  resampling = uninstantiate_resampling(
+    make_outer_resampling(task_ul_vodafone, dataset_ul, drive_ids_train=1:7, drive_ids_test=8:10)
+  ),
+  measure = msr("regr.mae"),
+  standardize = TRUE,
+  nmc=num_permutation_sims_ul
+)
+filter_permutation_vodafone$calculate(task_ul_vodafone)
+permutation_ul_vodafone = tibble(as.data.table(filter_permutation_vodafone)) %>% mutate(provider="vodafone")
+
+permutation_ul = bind_rows(
+  permutation_ul_o2,
+  permutation_ul_tmobile,
+  permutation_ul_vodafone
+)
 ```
 
 ```{r}
-ggplot(permutation_results_o2) +
-  geom_bar(aes(x = reorder(feature, -score), y = score), stat="identity") +
+ggplot(permutation_ul) +
+  geom_bar(position = "dodge", aes(x = feature, y = score, fill = provider), stat="identity") +
   xlab("feature") +
   ylab("MAE difference") +
   scale_x_discrete(guide = guide_axis(angle = 20)) +
   ggtitle("Permutation Feature Importance")
+```
+
+
+# Download-Rate Prediction
+
+## Reading the Data
+
+```{r}
+dataset_dl = read_csv(
+  str_c(data_dir, "dataset_dl.csv"), 
+  col_types = cols(
+    drive_id = col_integer(),
+    scenario = col_factor(), 
+    provider = col_factor(), 
+    ci = col_factor(), 
+    enodeb = col_factor()
+  )
+) %>% select(
+  drive_id,
+  timestamp,
+  scenario,
+  provider,
+  velocity_mps,
+  acceleration_mpss,
+  rsrp_dbm,
+  rsrq_db,
+  rssnr_db,
+  cqi,
+  ta,
+  enodeb,
+  f_mhz,
+  payload_mb,
+  throughput_mbits
+) %>% drop_na() %>% rowid_to_column(var="row_id_original")
+```
+
+```{r}
+dataset_dl_o2 = filter(dataset_dl, provider=="o2")
+glimpse(dataset_dl_o2)
+
+dataset_dl_tmobile = filter(dataset_dl, provider=="tmobile")
+glimpse(dataset_dl_tmobile)
+
+dataset_dl_vodafone = filter(dataset_dl, provider=="vodafone")
+glimpse(dataset_dl_vodafone)
+```
+
+## Create the Prediction Tasks for Each Provider
+
+```{r}
+task_dl_o2 = make_task(dataset_dl_o2, "task_dl_o2")
+task_dl_o2
+
+task_dl_tmobile = make_task(dataset_dl_tmobile, "task_dl_tmobile")
+task_dl_tmobile
+
+task_dl_vodafone = make_task(dataset_dl_vodafone, "task_dl_vodafone")
+task_dl_vodafone
+```
+
+## Parameter Tuning
+
+```{r, results = "hide"}
+tuning_result_dl_o2 = get_tuning_result(task_dl_o2, dataset_dl, grid_resolution = 20, n_evals = 10)
+
+tuning_result_dl_tmobile = get_tuning_result(task_dl_tmobile, dataset_dl, grid_resolution = 20, n_evals = 10)
+
+tuning_result_dl_vodafone = get_tuning_result(task_dl_vodafone, dataset_dl, grid_resolution = 20, n_evals = 10)
+```
+
+```{r}
+tuning_result_dl = bind_rows(
+  tibble(tuning_result_dl_o2$result) %>% mutate(provider="o2"),
+  tibble(tuning_result_dl_tmobile$result) %>% mutate(provider="tmobile"),
+  tibble(tuning_result_dl_vodafone$result) %>% mutate(provider="vodafone"),
+) %>% select("provider", "regr.xgboost.nrounds", "regr.xgboost.eta", "regr.xgboost.gamma", "regr.xgboost.lambda")
+knitr::kable(tuning_result_dl)
+```
+
+## Create Learners with Tuned Hyperparameters
+
+```{r}
+learner_dl_o2 = make_learner(
+  nrounds = tuning_result_dl_o2$result$regr.xgboost.nrounds,
+  eta = tuning_result_dl_o2$result$regr.xgboost.eta,
+  gamma = tuning_result_dl_o2$result$regr.xgboost.gamma,
+  lambda = tuning_result_dl_o2$result$regr.xgboost.lambda
+)
+
+learner_dl_tmobile = make_learner(
+  nrounds = tuning_result_dl_tmobile$result$regr.xgboost.nrounds,
+  eta = tuning_result_dl_tmobile$result$regr.xgboost.eta,
+  gamma = tuning_result_dl_tmobile$result$regr.xgboost.gamma,
+  lambda = tuning_result_dl_tmobile$result$regr.xgboost.lambda
+)
+
+learner_dl_vodafone = make_learner(
+  nrounds = tuning_result_dl_vodafone$result$regr.xgboost.nrounds,
+  eta = tuning_result_dl_vodafone$result$regr.xgboost.eta,
+  gamma = tuning_result_dl_vodafone$result$regr.xgboost.gamma,
+  lambda = tuning_result_dl_vodafone$result$regr.xgboost.lambda
+)
+```
+
+## Validation Results
+
+```{r, results = "hide"}
+resampling_result_dl_o2 = resample(
+  task = task_dl_o2,
+  learner = learner_dl_o2,
+  resampling = make_outer_resampling(task_dl_o2, dataset_dl, drive_ids_train=1:7, drive_ids_test=8:10),
+  store_models = TRUE
+)
+
+resampling_result_dl_tmobile = resample(
+  task = task_dl_tmobile,
+  learner = learner_dl_tmobile,
+  resampling = make_outer_resampling(task_dl_tmobile, dataset_dl, drive_ids_train=1:7, drive_ids_test=8:10),
+  store_models = TRUE
+)
+
+resampling_result_dl_vodafone = resample(
+  task = task_dl_vodafone,
+  learner = learner_dl_vodafone,
+  resampling = make_outer_resampling(task_dl_vodafone, dataset_dl, drive_ids_train=1:7, drive_ids_test=8:10),
+  store_models = TRUE
+)
+```
+
+```{r}
+predictions_dl_o2 = as.data.table(resampling_result_dl_o2$prediction())
+glimpse(tibble(predictions_dl_o2))
+predictions_dl_tmobile = as.data.table(resampling_result_dl_tmobile$prediction())
+predictions_dl_vodafone = as.data.table(resampling_result_dl_vodafone$prediction())
+```
+
+```{r}
+validation_results_dl = bind_rows(
+  tibble(predictions_dl_o2) %>% 
+    inner_join(tibble(task_dl_o2$row_names), by="row_id") %>% 
+    inner_join(dataset_dl, by=c("row_name"="row_id_original")),
+  tibble(predictions_dl_tmobile) %>% 
+    inner_join(tibble(task_dl_tmobile$row_names), by="row_id") %>% 
+    inner_join(dataset_dl, by=c("row_name"="row_id_original")),
+  tibble(predictions_dl_vodafone) %>% 
+    inner_join(tibble(task_dl_vodafone$row_names), by="row_id") %>% 
+    inner_join(dataset_dl, by=c("row_name"="row_id_original"))
+)
+glimpse(validation_results_dl)
+```
+
+```{r}
+all(validation_results_dl$truth == validation_results_dl$throughput_mbits)
+```
+
+### Scatter Plots
+
+```{r}
+ggplot(filter(validation_results_dl, provider=="o2"), aes(x=truth, y=response)) +
+  geom_point(aes(color=scenario, shape=scenario)) +
+  xlab("Measured Data Rate [MBit/s]") +
+  ylab("Predicted Data Rate [MBit/s]") +
+  ggtitle("Download-Rate Predictions for Provider O2")
+```
+
+```{r}
+ggplot(filter(validation_results_dl, provider=="tmobile"), aes(x=truth, y=response)) +
+  geom_point(aes(color=scenario, shape=scenario)) +
+  xlab("Measured Data Rate [MBit/s]") +
+  ylab("Predicted Data Rate [MBit/s]") +
+  ggtitle("Download-Rate Predictions for Provider T-Mobile")
+```
+
+```{r}
+ggplot(filter(validation_results_dl, provider=="vodafone"), aes(x=truth, y=response)) +
+  geom_point(aes(color=scenario, shape=scenario)) +
+  xlab("Measured Data Rate [MBit/s]") +
+  ylab("Predicted Data Rate [MBit/s]") +
+  ggtitle("Download-Rate Predictions for Provider Vodafone")
 ```
