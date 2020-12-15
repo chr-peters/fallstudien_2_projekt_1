@@ -14,15 +14,15 @@ library(sugrrants)
 library(tseries)
 
 setwd("~/GitHub/fallstudien_2_projekt_1/datasets")
-ul_data <- read.csv2("dataset_dl.csv", header=TRUE, sep=",", dec=".") 
-ul_data <- na.omit(ul_data)
+dl_data <- read.csv2("dataset_dl.csv", header=TRUE, sep=",", dec=".") 
+dl_data <- na.omit(dl_data)
 
 
 ## Teile Daten nach Provider auf
 
-vodafone <- ul_data[ul_data$provider == "vodafone", ]
-tmobile <- ul_data[ul_data$provider == "tmobile", ]
-o2 <- ul_data[ul_data$provider == "o2", ]
+vodafone <- dl_data[dl_data$provider == "vodafone", ]
+tmobile <- dl_data[dl_data$provider == "tmobile", ]
+o2 <- dl_data[dl_data$provider == "o2", ]
 providers <- list("vodafone" = vodafone, "tmobile" = tmobile, "o2" = o2)
 
 ## Features
@@ -57,9 +57,9 @@ throughputs <- list(vodafone = train$vodafone$throughput_mbits,
                     tmobile = train$tmobile$throughput_mbits, 
                     o2 = train$o2$throughput_mbits)
 plot_acf(throughputs, type = "acf", 
-         title = "Autokorrelationsfunktionen der Variable 'throughput_mbits'")
+         title = "Autokorrelationsfunktionen der Variable 'throughput_mbits' - Downlink")
 plot_acf(throughputs, type = "pacf", 
-         title = "partielle Autokorrelationsfunktionen der Variable 'throughput_mbits'")
+         title = "partielle Autokorrelationsfunktionen der Variable 'throughput_mbits' - Downlink")
 
 
 ## Test auf Stationarität: Augmented Dickey-Fuller Test
@@ -134,14 +134,14 @@ res_o2 <- data.frame(res = rstandard(lm_o2), provider = "O2")
 res_data <- rbind(res_vodafone, res_tmobile, res_o2)
 ggplot(res_data, aes(sample=res)) + geom_qq() + 
   geom_abline(intercept = 0, slope = 1, color = "red", size = 1, alpha = 0.8) + 
-  facet_wrap(~provider) + ggtitle("QQ-Plots Normalverteilung") + 
+  facet_wrap(~provider) + ggtitle("QQ-Plots Normalverteilung - Downlink") + 
   xlab("theoretische Quantile") + ylab("Quantile der Residuen")
 
 
 # Histogramme
 
 ggplot(res_data, aes(x = res)) + geom_histogram(color="black", fill="pink") + 
-  facet_wrap(~ provider) + ggtitle("Histogramme der Residuen") + 
+  facet_wrap(~ provider) + ggtitle("Histogramme der Residuen - Downlink") + 
   xlab("Residuen") + ylab("Anzahl")
 
 
@@ -157,9 +157,9 @@ plot_data <- list(vodafone = lm_vodafone$residuals,
                         tmobile = lm_tmobile$residuals, 
                         o2 = lm_o2$residuals)
 plot_acf(plot_data, type = "acf", 
-         title = "Autokorrelationsfunktionen der Residuen")
+         title = "Autokorrelationsfunktionen der Residuen - Downlink")
 plot_acf(plot_data, type = "pacf", 
-         title = "partielle Autokorrelationsfunktionen der Residuen")
+         title = "partielle Autokorrelationsfunktionen der Residuen - Downlink")
 
 ## Bestimme Parameterrange aus ACF und PACF Plots für das Grid zum tunen der Parmaeter p,q
 
@@ -367,24 +367,24 @@ provider <- "o2"
 ############################# Zeitreihenplot  
   
 actual <- data.frame(
-  value = ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
+  value = dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                   "throughput_mbits"], 
   type = "actual", 
-  timestamp = anytime(ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
+  timestamp = anytime(dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                               "timestamp_ms"]),
-  drive_id = ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
+  drive_id = dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                      "drive_id"], 
-  scenario = ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
+  scenario = dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                      "scenario"])
 
 vorhersage <- data.frame(
   value = predictions[[provider]]$rescaled_forecast, 
   type = "predict", 
-  timestamp = anytime(ul_data[(ul_data["drive_id"]==8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
+  timestamp = anytime(dl_data[(dl_data["drive_id"]==8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                               "timestamp_ms"]),
-  drive_id = ul_data[(ul_data["drive_id"]==8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
+  drive_id = dl_data[(dl_data["drive_id"]==8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                      "drive_id"], 
-  scenario = ul_data[(ul_data["drive_id"]==8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
+  scenario = dl_data[(dl_data["drive_id"]==8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                      "scenario"])
 plot_data <- rbind(actual, vorhersage)
 
@@ -400,7 +400,7 @@ ggplot(
 ) + 
   geom_line() + 
   facet_wrap(drive_id~scenario, scales = "free", ncol = 4) + 
-  ggtitle(name_mapping[[provider]]) + 
+  ggtitle(name_mapping[[provider]], "- Downlink") + 
   xlab("Zeit") + 
   ylab("Datenübertragungsrate in MBit/s") +
   theme(legend.title = element_blank()) +
@@ -411,7 +411,7 @@ ggplot(
 plot_data <- data.frame(actual = actual$value, 
                         predict = vorhersage$value)
 plot_data <- cbind(plot_data, 
-                   ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
+                   dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                            c("drive_id", "scenario")])
 
 ggplot(
@@ -421,7 +421,7 @@ ggplot(
   geom_point() + 
   geom_abline(color = "red", intercept = 0, slope = 1) +
   facet_wrap(drive_id ~ scenario, scales = "free", ncol = 4) + 
-  ggtitle(paste("Scatterplot der Beobachtungen und der Vorhersagen:", name_mapping[[provider]])) + 
+  ggtitle(paste("Scatterplot der Beobachtungen und der Vorhersagen:", name_mapping[[provider]]), "- Downlink") + 
   xlab("Beobachtungen") + 
   ylab("Vorhersage")
   
@@ -442,7 +442,7 @@ ggplot(data = df, aes(x = kennzahl, y = value, fill = provider)) +
   facet_wrap(~ kennzahl, scales = "free") +
   theme(legend.title = element_blank()) +
   scale_fill_hue(labels = c("O2", "T-Mobile", "Vodafone")) + 
-  ggtitle("Vergleich der Kennzahlen der verschiedenen Provider") + 
+  ggtitle("Vergleich der Kennzahlen der verschiedenen Provider - Downlink") + 
   xlab("Kennzahlen") + 
   ylab("Wert") 
   
