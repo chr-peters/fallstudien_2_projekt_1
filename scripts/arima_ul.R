@@ -1,4 +1,8 @@
-source("C:/Users/Alina/Documents/GitHub/fallstudien_2_projekt_1/scripts/arima_helpers.R")
+path <- paste("C:/Users/", 
+              Sys.getenv("USERNAME"), 
+              "/Documents/GitHub/fallstudien_2_projekt_1/scripts/arima_helpers.R", 
+              sep = "")
+source(path)
 library(forecast)
 library(fastDummies)
 library(dplyr)
@@ -366,32 +370,38 @@ for (provider in c("vodafone", "tmobile", "o2")){
 
 ## Plot
 
-provider <- "o2"
+provider <- "vodafone"
 
 ############################# Zeitreihenplot  
 
 actual <- data.frame(
-  value = ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
+  value = dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                   "throughput_mbits"], 
   type = "actual", 
-  timestamp = anytime(ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
+  timestamp = anytime(dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                               "timestamp_ms"]),
-  drive_id = ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
+  drive_id = dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                      "drive_id"], 
-  scenario = ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
-                     "scenario"])
+  scenario = dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
+                     "scenario"],
+  upper = unclass(predictions[[provider]]$upper[,"80%"] * attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
+                    attr(train[[provider]], "scaled:center")["throughput_mbits"]),
+  lower = unclass(predictions[[provider]]$lower[,"80%"] * attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
+                    attr(train[[provider]], "scaled:center")["throughput_mbits"]))
 
 vorhersage <- data.frame(
   value = predictions[[provider]]$rescaled_forecast, 
   type = "predict", 
-  timestamp = anytime(ul_data[(ul_data["drive_id"]==8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
+  timestamp = anytime(dl_data[(dl_data["drive_id"]==8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                               "timestamp_ms"]),
-  drive_id = ul_data[(ul_data["drive_id"]==8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
+  drive_id = dl_data[(dl_data["drive_id"]==8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                      "drive_id"], 
-  scenario = ul_data[(ul_data["drive_id"]==8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
+  scenario = dl_data[(dl_data["drive_id"]==8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
                      "scenario"],
-  upper = predictions[["vodafone"]]$upper[,"95%"],
-  lower = predictions[["vodafone"]]$lower[,"95%"])
+  upper = unclass(predictions[[provider]]$upper[,"80%"])* attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
+    attr(train[[provider]], "scaled:center")["throughput_mbits"],
+  lower = unclass(predictions[[provider]]$lower[,"80%"])* attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
+    attr(train[[provider]], "scaled:center")["throughput_mbits"])
 plot_data <- rbind(actual, vorhersage)
 
 name_mapping = list(
@@ -404,14 +414,19 @@ ggplot(
   plot_data, 
   aes(x = timestamp, y = value, color = type)
 ) + 
-  geom_line() + 
-  geom_ribbon(aes(ymin = lower, ymax = upper), size = 0, alpha = 0.1) +
-  facet_wrap(drive_id~scenario, scales = "free", ncol = 4) + 
-  ggtitle(name_mapping[[provider]], "- Uplink") + 
+  geom_line(size=1) + 
+  geom_ribbon(aes(ymin = lower, ymax = upper), colour = NA, alpha = 0.2) +
+  facet_wrap(drive_id~scenario, 
+             scales = "free", 
+             ncol = 4, 
+             labeller = label_wrap_gen(multi_line=FALSE)) + 
+  ggtitle(paste(name_mapping[[provider]], "- Uplink", sep = " ")) + 
   xlab("Zeit") + 
   ylab("Datenübertragungsrate in MBit/s") +
-  theme(legend.title = element_blank()) +
-  scale_color_hue(labels = c("Beobachtung", "Vorhersage"))
+  theme_grey(base_size = 14) +
+  theme(legend.position="bottom", 
+        legend.title = element_blank()) +
+  scale_color_hue(labels = c("Beobachtung", "Vorhersage mit 80% KI"))
 
 ######################### Scatterplot #funktioniert nicht bei o2
 
@@ -427,10 +442,14 @@ ggplot(
 ) + 
   geom_point() + 
   geom_abline(color = "red", intercept = 0, slope = 1) +
-  facet_wrap(drive_id ~ scenario, scales = "free", ncol = 4) + 
-  ggtitle(paste("Scatterplot der Beobachtungen und der Vorhersagen:", name_mapping[[provider]]), "- Uplink") + 
+  facet_wrap(drive_id ~ scenario, 
+             scales = "free", 
+             ncol = 4, 
+             labeller = label_wrap_gen(multi_line=FALSE)) + 
+  ggtitle(paste("Scatterplot der Beobachtungen und der Vorhersagen:", name_mapping[[provider]], "- Uplink")) + 
   xlab("Beobachtungen") + 
-  ylab("Vorhersage")
+  ylab("Vorhersage") +
+  theme_grey(base_size = 14)
 #}  
 
 ######################## Barplot Vergleich Kennzahlen 
@@ -448,11 +467,13 @@ df <- data.frame(provider = rep(c("vodafone", "tmobile", "o2"), each = 3),
 ggplot(data = df, aes(x = kennzahl, y = value, fill = provider)) +
   geom_bar(stat = "identity", position = position_dodge()) + 
   facet_wrap(~ kennzahl, scales = "free") +
-  theme(legend.title = element_blank()) +
+  theme_grey(base_size = 18) +
+  theme(legend.title = element_blank(), 
+        legend.position = "bottom") +
   scale_fill_hue(labels = c("O2", "T-Mobile", "Vodafone")) + 
   ggtitle("Vergleich der Kennzahlen der verschiedenen Provider - Uplink") + 
   xlab("Kennzahlen") + 
-  ylab("Wert") 
+  ylab("Wert")
 
 
 
