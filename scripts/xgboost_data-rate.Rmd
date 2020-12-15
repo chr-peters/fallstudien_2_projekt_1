@@ -18,6 +18,10 @@ library(mlr3tuning)
 library(paradox)
 ```
 
+```{r}
+future::plan("multiprocess")
+```
+
 # Upload-Rate Prediction
 
 ## Reading the Data
@@ -255,54 +259,22 @@ learner_ul_vodafone = make_learner(
 
 ## Validation Results
 
-### Provider O2
-
 ```{r, results = "hide"}
-validation_result_ul_o2 = resample(
+resampling_result_ul_o2 = resample(
   task = task_ul_o2,
   learner = learner_ul_o2,
   resampling = make_outer_resampling(task_ul_o2, drive_ids_train=1:7, drive_ids_test=8:10),
   store_models = TRUE
 )
-```
 
-```{r}
-validation_result_ul_o2$aggregate(msr("regr.rsq"))
-validation_result_ul_o2$aggregate(msr("regr.mae"))
-```
-
-```{r}
-predictions_ul_o2 = as.data.table(validation_result_ul_o2$prediction())
-ggplot(predictions_ul_o2, aes(x=truth, y=response)) +
-  geom_point()
-```
-
-### Provider T-Mobile
-
-```{r, results = "hide"}
-validation_result_ul_tmobile = resample(
+resampling_result_ul_tmobile = resample(
   task = task_ul_tmobile,
   learner = learner_ul_tmobile,
   resampling = make_outer_resampling(task_ul_tmobile, drive_ids_train=1:7, drive_ids_test=8:10),
   store_models = TRUE
 )
-```
 
-```{r}
-validation_result_ul_tmobile$aggregate(msr("regr.rsq"))
-validation_result_ul_tmobile$aggregate(msr("regr.mae"))
-```
-
-```{r}
-predictions_ul_tmobile = as.data.table(validation_result_ul_tmobile$prediction())
-ggplot(predictions_ul_tmobile, aes(x=truth, y=response)) +
-  geom_point()
-```
-
-### Provider Vodafone
-
-```{r, results = "hide"}
-validation_result_ul_vodafone = resample(
+resampling_result_ul_vodafone = resample(
   task = task_ul_vodafone,
   learner = learner_ul_vodafone,
   resampling = make_outer_resampling(task_ul_vodafone, drive_ids_train=1:7, drive_ids_test=8:10),
@@ -311,12 +283,47 @@ validation_result_ul_vodafone = resample(
 ```
 
 ```{r}
-validation_result_ul_vodafone$aggregate(msr("regr.rsq"))
-validation_result_ul_vodafone$aggregate(msr("regr.mae"))
+predictions_ul_o2 = as.data.table(resampling_result_ul_o2$prediction())
+glimpse(tibble(predictions_ul_o2))
+predictions_ul_tmobile = as.data.table(resampling_result_ul_tmobile$prediction())
+predictions_ul_vodafone = as.data.table(resampling_result_ul_vodafone$prediction())
 ```
 
 ```{r}
-predictions_ul_vodafone = as.data.table(validation_result_ul_vodafone$prediction())
-ggplot(predictions_ul_vodafone, aes(x=truth, y=response)) +
-  geom_point()
+validation_results_ul = bind_rows(
+  tibble(predictions_ul_o2) %>% 
+    inner_join(tibble(task_ul_o2$row_names), by="row_id") %>% 
+    inner_join(dataset_ul, by=c("row_name"="row_id_original")),
+  tibble(predictions_ul_tmobile) %>% 
+    inner_join(tibble(task_ul_tmobile$row_names), by="row_id") %>% 
+    inner_join(dataset_ul, by=c("row_name"="row_id_original")),
+  tibble(predictions_ul_vodafone) %>% 
+    inner_join(tibble(task_ul_vodafone$row_names), by="row_id") %>% 
+    inner_join(dataset_ul, by=c("row_name"="row_id_original"))
+)
+glimpse(validation_results_ul)
+```
+
+```{r}
+all(validation_results_ul$truth == validation_results_ul$throughput_mbits)
+```
+
+### Scatter Plots
+
+```{r}
+ggplot(filter(validation_results_ul, provider=="o2"), aes(x=truth, y=response)) +
+  geom_point(aes(color=scenario, shape=scenario)) +
+  ggtitle("Predictions for Provider O2")
+```
+
+```{r}
+ggplot(filter(validation_results_ul, provider=="tmobile"), aes(x=truth, y=response)) +
+  geom_point(aes(color=scenario, shape=scenario)) +
+  ggtitle("Predictions for Provider T-Mobile")
+```
+
+```{r}
+ggplot(filter(validation_results_ul, provider=="vodafone"), aes(x=truth, y=response)) +
+  geom_point(aes(color=scenario, shape=scenario)) +
+  ggtitle("Predictions for Provider Vodafone")
 ```
