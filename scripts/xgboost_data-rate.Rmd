@@ -15,6 +15,7 @@ library(mlr3)
 library(mlr3learners)
 library(mlr3pipelines)
 library(mlr3tuning)
+library(mlr3filters)
 library(paradox)
 ```
 
@@ -464,4 +465,46 @@ ggplot(results_by_provider_and_scenario, aes(x=scenario, y=rsq, fill=provider)) 
 ggplot(results_by_provider_and_scenario, aes(x=scenario, y=mae, fill=provider)) +
   geom_bar(position = "dodge", stat = "identity") +
   ggtitle("MAE by Provider and Scenario")
+```
+
+## Feature Importance
+
+```{r}
+uninstantiate_resampling = function(resampling) {
+  new_resampling = new.env()
+  class(new_resampling) = class(resampling)
+  for (val in ls(resampling)) {
+    if (val != "is_instantiated") {
+      assign(val, get(val, envir=resampling), envir = new_resampling)
+    }
+  }
+  new_resampling$is_instantiated = FALSE
+  
+  return(new_resampling)
+}
+```
+
+### Provider O2
+
+```{r, results='hide'}
+filter_permutation_o2 = flt("permutation",
+  learner = make_learner(),
+  resampling = uninstantiate_resampling(
+    make_outer_resampling(task_ul_o2, drive_ids_train=1:7, drive_ids_test=8:10)
+  ),
+  measure = msr("regr.mae"),
+  standardize = TRUE,
+  nmc=10
+)
+filter_permutation_o2$calculate(task_ul_o2)
+permutation_results_o2 = as.data.table(filter_permutation_o2)
+```
+
+```{r}
+ggplot(permutation_results_o2) +
+  geom_bar(aes(x = reorder(feature, -score), y = score), stat="identity") +
+  xlab("feature") +
+  ylab("MAE difference") +
+  scale_x_discrete(guide = guide_axis(angle = 20)) +
+  ggtitle("Permutation Feature Importance")
 ```
