@@ -389,7 +389,9 @@ vorhersage <- data.frame(
   drive_id = ul_data[(ul_data["drive_id"]==8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
                      "drive_id"], 
   scenario = ul_data[(ul_data["drive_id"]==8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
-                     "scenario"])
+                     "scenario"],
+  upper = predictions[["vodafone"]]$upper[,"95%"],
+  lower = predictions[["vodafone"]]$lower[,"95%"])
 plot_data <- rbind(actual, vorhersage)
 
 name_mapping = list(
@@ -403,6 +405,7 @@ ggplot(
   aes(x = timestamp, y = value, color = type)
 ) + 
   geom_line() + 
+  geom_ribbon(aes(ymin = lower, ymax = upper), size = 0, alpha = 0.1) +
   facet_wrap(drive_id~scenario, scales = "free", ncol = 4) + 
   ggtitle(name_mapping[[provider]], "- Uplink") + 
   xlab("Zeit") + 
