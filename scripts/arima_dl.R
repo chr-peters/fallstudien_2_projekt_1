@@ -362,7 +362,7 @@ for (provider in c("vodafone", "tmobile", "o2")){
 
 ## Plot
 
-provider <- "tmobile"
+provider <- "vodafone"
   
 ############################# Zeitreihenplot  
   
