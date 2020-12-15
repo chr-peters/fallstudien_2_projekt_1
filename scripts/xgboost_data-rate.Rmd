@@ -327,3 +327,141 @@ ggplot(filter(validation_results_ul, provider=="vodafone"), aes(x=truth, y=respo
   geom_point(aes(color=scenario, shape=scenario)) +
   ggtitle("Predictions for Provider Vodafone")
 ```
+
+### Performance Measures
+
+```{r}
+compute_measure = function(measure, dataset, truth_column, response_column, providers, scenarios) {
+  data_subset = filter(dataset, provider %in% providers, scenario %in% scenarios)
+  truth = data_subset[[truth_column]]
+  response = data_subset[[response_column]]
+  
+  tmp_prediction = PredictionRegr$new(
+    row_ids = seq_along(truth),
+    truth = truth,
+    response = response
+  )
+  
+  result = measure$score(tmp_prediction)
+  return(result)
+}
+```
+
+```{r}
+scenarios = c("campus", "suburban", "highway", "urban")
+providers = c("o2", "tmobile", "vodafone")
+
+results_by_provider = tibble()
+for (cur_provider in providers) {
+  cur_rsq = compute_measure(
+    measure = msr("regr.rsq"),
+    dataset = validation_results_ul, 
+    truth_column = "truth", 
+    response_column = "response", 
+    providers = cur_provider,
+    scenarios = scenarios
+  )
+  cur_mae = compute_measure(
+    measure = msr("regr.mae"),
+    dataset = validation_results_ul, 
+    truth_column = "truth", 
+    response_column = "response", 
+    providers = cur_provider,
+    scenarios = scenarios
+  )
+  
+  results_by_provider = bind_rows(results_by_provider, list("provider"=cur_provider, "rsq"=cur_rsq, "mae"=cur_mae))
+}
+
+results_by_scenario = tibble()
+for (cur_scenario in scenarios) {
+  cur_rsq = compute_measure(
+    measure = msr("regr.rsq"),
+    dataset = validation_results_ul, 
+    truth_column = "truth", 
+    response_column = "response", 
+    providers = providers,
+    scenarios = cur_scenario
+  )
+  cur_mae = compute_measure(
+    measure = msr("regr.mae"),
+    dataset = validation_results_ul, 
+    truth_column = "truth", 
+    response_column = "response", 
+    providers = providers,
+    scenarios = cur_scenario
+  )
+  
+  results_by_scenario = bind_rows(results_by_scenario, list("scenario"=cur_scenario, "rsq"=cur_rsq, "mae"=cur_mae))
+}
+
+results_by_provider_and_scenario = tibble()
+for (cur_provider in providers) {
+  for (cur_scenario in scenarios) {
+    cur_rsq = compute_measure(
+      measure = msr("regr.rsq"),
+      dataset = validation_results_ul, 
+      truth_column = "truth", 
+      response_column = "response", 
+      providers = cur_provider,
+      scenarios = cur_scenario
+    )
+    cur_mae = compute_measure(
+      measure = msr("regr.mae"),
+      dataset = validation_results_ul, 
+      truth_column = "truth", 
+      response_column = "response", 
+      providers = cur_provider,
+      scenarios = cur_scenario
+    )
+    
+    results_by_provider_and_scenario = bind_rows(
+      results_by_provider_and_scenario, 
+      list(
+        provider = cur_provider,
+        scenario = cur_scenario,
+        rsq=cur_rsq, 
+        mae=cur_mae
+      )
+    )
+  }
+}
+```
+
+```{r}
+knitr::kable(results_by_provider)
+knitr::kable(results_by_scenario)
+knitr::kable(results_by_provider_and_scenario)
+```
+
+```{r}
+ggplot(results_by_provider, aes(x=provider, y=rsq)) +
+  geom_bar(stat = "identity") +
+  ylim(c(0, 1)) +
+  ggtitle("R^2 by Provider")
+
+ggplot(results_by_provider, aes(x=provider, y=mae)) +
+  geom_bar(stat = "identity") +
+  ggtitle("MAE by Provider")
+```
+
+```{r}
+ggplot(results_by_scenario, aes(x=scenario, y=rsq)) +
+  geom_bar(stat = "identity") +
+  ylim(c(0, 1)) +
+  ggtitle("R^2 by Scenario")
+
+ggplot(results_by_scenario, aes(x=scenario, y=mae)) +
+  geom_bar(stat = "identity") +
+  ggtitle("MAE by Scenario")
+```
+
+```{r}
+ggplot(results_by_provider_and_scenario, aes(x=scenario, y=rsq, fill=provider)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  ggtitle("R^2 by Provider and Scenario")
+
+ggplot(results_by_provider_and_scenario, aes(x=scenario, y=mae, fill=provider)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  ggtitle("MAE by Provider and Scenario")
+```
