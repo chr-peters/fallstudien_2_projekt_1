@@ -1,0 +1,108 @@
+
+
+setwd("~/GitHub/fallstudien_2_projekt_1/prediction_results")
+
+data_ul <- read.csv("predictions_ul.csv", header=TRUE, sep=",", dec=".")
+data_dl <- read.csv("predictions_dl.csv", header=TRUE, sep=",", dec=".")
+
+
+kennzahlen_ul_xgboost <- list("vodafone" = list(), 
+                         "tmobile" = list(), 
+                         "o2" = list())
+
+kennzahlen_ul_arima <- list("vodafone" = list(), 
+                            "tmobile" = list(), 
+                            "o2" = list())
+
+kennzahlen_dl_xgboost <- list("vodafone" = list(), 
+                           "tmobile" = list(), 
+                           "o2" = list())
+
+kennzahlen_dl_arima <- list("vodafone" = list(), 
+                      "tmobile" = list(), 
+                      "o2" = list())
+
+
+for (provider in c("vodafone", "tmobile", "o2")){
+  subset_ul <- data_ul[data_ul$provider == provider, ]
+  subset_dl <- data_dl[data_dl$provider == provider, ]
+  
+  kennzahlen_ul_xgboost[[provider]]$mae <- mae(subset_ul$prediction_xgboost, subset_ul$throughput_mbits)
+  kennzahlen_ul_xgboost[[provider]]$rsquared <- 1 - sum((subset_ul$prediction_xgboost-subset_ul$throughput_mbits)^2)/
+    sum((mean(subset_ul$throughput_mbits)-subset_ul$throughput_mbits)^2)
+    
+  kennzahlen_dl_xgboost[[provider]]$mae <- mae(subset_dl$prediction_xgboost, subset_dl$throughput_mbits)
+  kennzahlen_dl_xgboost[[provider]]$rsquared <- 1 - sum((subset_dl$prediction_xgboost-subset_dl$throughput_mbits)^2)/
+    sum((mean(subset_dl$throughput_mbits)-subset_dl$throughput_mbits)^2)
+    
+  kennzahlen_ul_arima[[provider]]$mae <- mae(subset_ul$prediction_arima, subset_ul$throughput_mbits)
+  kennzahlen_ul_arima[[provider]]$rsquared <- 1 - sum((subset_ul$prediction_arima-subset_ul$throughput_mbits)^2)/
+    sum((mean(subset_ul$throughput_mbits)-subset_ul$throughput_mbits)^2)
+    
+  kennzahlen_dl_arima[[provider]]$mae <- mae(subset_dl$prediction_arima, subset_dl$throughput_mbits)
+  kennzahlen_dl_arima[[provider]]$rsquared <- 1 - sum((subset_dl$prediction_arima-subset_dl$throughput_mbits)^2)/
+    sum((mean(subset_dl$throughput_mbits)-subset_dl$throughput_mbits)^2)
+    
+}
+
+## UL
+df_ul <- data.frame(model = rep(c("XGBoost", "LM+Arima"), each = 6),
+                 provider = rep(c("Vodafone", "T-Mobile", "O2"), 4),
+                 kennzahl = c(rep(c("MAE", "R²"), each = 3),rep(c("MAE", "R²"), each = 3)),
+                 value = c(kennzahlen_ul_xgboost$vodafone$mae,
+                           kennzahlen_ul_xgboost$tmobile$mae,
+                           kennzahlen_ul_xgboost$o2$mae,
+                           kennzahlen_ul_xgboost$vodafone$rsquared,
+                           kennzahlen_ul_xgboost$tmobile$rsquared,
+                           kennzahlen_ul_xgboost$o2$rsquared,
+                           kennzahlen_ul_arima$vodafone$mae,
+                           kennzahlen_ul_arima$tmobile$mae,
+                           kennzahlen_ul_arima$o2$mae,
+                           kennzahlen_ul_arima$vodafone$rsquared,
+                           kennzahlen_ul_arima$tmobile$rsquared,
+                           kennzahlen_ul_arima$o2$rsquared))
+
+ggplot(data = df_ul, aes(x = model, y = value, fill = model) )+
+  geom_bar(stat = "identity", position = position_dodge()) + 
+  facet_grid(kennzahl ~ provider, scales = "free_y") +
+  theme_grey(base_size = 18) +
+  theme(legend.title = element_blank(), 
+        legend.position = "none") +
+  ggtitle("Vergleich der Kennzahlen der verschiedenen Modelle - Uplink") + 
+  xlab("Modelle") + 
+  ylab("Wert")
+
+## DL
+
+df_dl <- data.frame(model = rep(c("XGBoost", "LM+Arima"), each = 6),
+                 provider = rep(c("Vodafone", "T-Mobile", "O2"), 4),
+                 kennzahl = c(rep(c("MAE", "R²"), each = 3),rep(c("MAE", "R²"), each = 3)),
+                 value = c(kennzahlen_dl_xgboost$vodafone$mae,
+                           kennzahlen_dl_xgboost$tmobile$mae,
+                           kennzahlen_dl_xgboost$o2$mae,
+                           kennzahlen_dl_xgboost$vodafone$rsquared,
+                           kennzahlen_dl_xgboost$tmobile$rsquared,
+                           kennzahlen_dl_xgboost$o2$rsquared,
+                           kennzahlen_dl_arima$vodafone$mae,
+                           kennzahlen_dl_arima$tmobile$mae,
+                           kennzahlen_dl_arima$o2$mae,
+                           kennzahlen_dl_arima$vodafone$rsquared,
+                           kennzahlen_dl_arima$tmobile$rsquared,
+                           kennzahlen_dl_arima$o2$rsquared))
+
+ggplot(data = df_dl, aes(x = model, y = value, fill = model) )+
+  geom_bar(stat = "identity", position = position_dodge()) + 
+  facet_grid(kennzahl ~ provider, scales = "free_y") +
+  theme_grey(base_size = 18) +
+  theme(legend.title = element_blank(), 
+        legend.position = "none") +
+  ggtitle("Vergleich der Kennzahlen der verschiedenen Modelle - Downlink") + 
+  xlab("Modelle") + 
+  ylab("Wert")
+
+
+
+
+
+
+
