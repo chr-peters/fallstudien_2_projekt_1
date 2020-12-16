@@ -1,5 +1,5 @@
 
-
+#--------------------KENNZAHLEN VERGLEICH XGBOOST/ARIMA----------------------------------------#
 setwd("~/GitHub/fallstudien_2_projekt_1/prediction_results")
 
 data_ul <- read.csv("predictions_ul.csv", header=TRUE, sep=",", dec=".")
@@ -46,6 +46,7 @@ for (provider in c("vodafone", "tmobile", "o2")){
 }
 
 ## UL
+
 df_ul <- data.frame(model = rep(c("XGBoost", "LM+Arima"), each = 6),
                  provider = rep(c("Vodafone", "T-Mobile", "O2"), 4),
                  kennzahl = c(rep(c("MAE", "R²"), each = 3),rep(c("MAE", "R²"), each = 3)),
@@ -99,6 +100,37 @@ ggplot(data = df_dl, aes(x = model, y = value, fill = model) )+
   ggtitle("Vergleich der Kennzahlen der verschiedenen Modelle - Downlink") + 
   xlab("Modelle") + 
   ylab("Wert")
+
+
+
+#--------------------FEATURE IMPORTANCE VERGLEICH XGBOOST/ARIMA----------------------------------------#
+
+setwd("~/GitHub/fallstudien_2_projekt_1/prediction_results")
+
+data <- read.csv("feature_importance_xgboost_linklifetime.csv", header = TRUE)
+
+
+df_ll <- data.frame(provider = rep(c(" ", "  ", "   "), each = 8),
+                    features = data$feature[-which(c(data$feature == "enodeb"))],
+                    #features = data$feature[-which(c(data$feature == "enodeb"))],
+                    value = data$Gain[-which(c(data$feature == "enodeb"))])
+                    #value = abs(data$Permutation[-which(c(data$feature == "enodeb"))]))
+
+name_mapping = c(
+  " " = "O2", 
+  "  " = "T-Mobile", 
+  "   " = "Vodafone"
+)
+
+ggplot(data = df_ll, aes(x = reorder_within(features, -value, provider, sep = " "), y = value, fill = provider)) +
+  geom_bar(stat = "identity" ) + 
+  facet_wrap(~ provider, scales = "free", labeller = as_labeller(name_mapping)) +
+  theme_grey(base_size = 18) +
+  theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
+        legend.position = "none") +
+  ggtitle("Feature Importance der verschiedenen Provider - Link-Lifetime") + 
+  xlab("Features") + 
+  ylab("Koeffizienten")
 
 
 

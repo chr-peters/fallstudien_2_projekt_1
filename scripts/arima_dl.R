@@ -485,20 +485,32 @@ for (provider in c("vodafone", "tmobile", "o2")){
 write.csv(data, "C:/Users/Laura/Documents/GitHub/fallstudien_2_projekt_1/prediction_results/prediction_arima_dl.csv", row.names = FALSE)
 
 
-########################################## Feature Importance
+#--------------------FEATURE IMPORTANCE----------------------------------------#
+
+setwd("~/GitHub/fallstudien_2_projekt_1/predicition_results")
+dldata <- read.csv("feature_importance_xgboost_dl.csv", header = TRUE)
+
+
+df_dl <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
+                    #features = uldata$feature[-which(c(data$feature == "enodeb"))],
+                    features = dldata$feature,
+                    #value = uldata$Gain[-which(c(data$feature == "enodeb"))])
+                    value = abs(dldata$Permutation))
+
 
 df1 <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
-                 features = rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
-                 value = abs(c(coeff$vodafone[-coeff$vodafone["intercept"]], coeff$tmobile[coeff$tmobile["intercept"]],
-                           coeff$o2[-coeff$o2["intercept"]])))
+                  features = rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
+                  value = abs(c(coeff$o2[-which(names(coeff$o2) == "intercept")], 
+                                coeff$tmobile[-which(names(coeff$tmobile) == "intercept")],
+                                coeff$vodafon[-which(names(coeff$vodafone) == "intercept")])))
 
 name_mapping = c(
-  " " = "Vodafone", 
+  " " = "O2", 
   "  " = "T-Mobile", 
-  "   " = "O2"
+  "   " = "Vodafone"
 )
 
-ggplot(data = df1, aes(x = reorder_within(features, -value, provider, sep = " "), y = value, fill = provider)) +
+ggplot(data = df_dl, aes(x = reorder_within(features, -value, provider, sep = " "), y = value, fill = provider)) +
   geom_bar(stat = "identity" ) + 
   facet_wrap(~ provider, scales = "free", labeller = as_labeller(name_mapping)) +
   theme_grey(base_size = 18) +

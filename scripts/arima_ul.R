@@ -16,6 +16,7 @@ library(lubridate)
 library(regclass)
 library(sugrrants)
 library(tseries)
+library(tidytext)
 
 setwd("~/GitHub/fallstudien_2_projekt_1/datasets")
 ul_data <- read.csv2("dataset_ul.csv", header=TRUE, sep=",", dec=".")
@@ -357,7 +358,7 @@ for (provider in c("vodafone", "tmobile", "o2")){
 
 provider <- "vodafone"
 
-############################# Zeitreihenplot  
+#--------------------ZEITREIHENPLOT----------------------------------------# 
 
 actual <- data.frame(
   value = ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
@@ -413,7 +414,7 @@ ggplot(
         legend.title = element_blank()) +
   scale_color_hue(labels = c("Beobachtung", "Vorhersage mit 80% KI"))
 
-######################### Scatterplot 
+#--------------------SCATTERPLOT----------------------------------------#
 
 plot_data <- data.frame(actual = actual$value, 
                         predict = vorhersage$value)
@@ -437,7 +438,7 @@ ggplot(
   theme_grey(base_size = 14)
 #}  
 
-######################## Barplot Vergleich Kennzahlen 
+#--------------------BARPLOT VEGLEICH KENNZAHLEN----------------------------------------# 
 
 
 df <- data.frame(provider = rep(c("vodafone", "tmobile", "o2"), each = 2),
@@ -461,27 +462,41 @@ ggplot(data = df, aes(x = kennzahl, y = value, fill = provider)) +
   ylab("Wert")
 
 #--------------------FEATURE IMPORTANCE----------------------------------------#
+
+
+setwd("~/GitHub/fallstudien_2_projekt_1/predicition_results")
+uldata <- read.csv("feature_importance_xgboost_ul.csv", header = TRUE)
+
+
+df_ul <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
+                    #features = uldata$feature[-which(c(data$feature == "enodeb"))],
+                    features = uldata$feature,
+                    #value = uldata$Gain[-which(c(data$feature == "enodeb"))])
+                    value = abs(uldata$Permutation))
+
+
 df1 <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
                   features = rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
-                  value = abs(c(coeff$vodafone[-coeff$vodafone["intercept"]], 
-                                coeff$tmobile[coeff$tmobile["intercept"]],
-                                coeff$o2[-coeff$o2["intercept"]])))
+                  value = abs(c(coeff$o2[-which(names(coeff$o2) == "intercept")], 
+                                coeff$tmobile[-which(names(coeff$tmobile) == "intercept")],
+                                coeff$vodafon[-which(names(coeff$vodafone) == "intercept")])))
 
 name_mapping = c(
-  " " = "Vodafone", 
-  "  " = "T-Mobile", 
-  "   " = "O2"
+  " " = "O2", 
+  " " = "T-Mobile", 
+  " " = "Vodafone"
 )
 
-ggplot(data = df1, aes(x = reorder_within(features, -value, provider, sep = " "), y = value, fill = provider)) +
+ggplot(data = df_ul, aes(x = reorder_within(features, -value, provider, sep = " "), y = value, fill = provider)) +
   geom_bar(stat = "identity" ) + 
   facet_wrap(~ provider, scales = "free", labeller = as_labeller(name_mapping)) +
   theme_grey(base_size = 18) +
   theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
         legend.position = "none") +
-  ggtitle("Feature Importance der verschiedenen Provider - Downlink") + 
+  ggtitle("Feature Importance der verschiedenen Provider - Uplink") + 
   xlab("Features") + 
   ylab("Koeffizienten")
+
 #------------------------------------------------------------------------------#
 
 
