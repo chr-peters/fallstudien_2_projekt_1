@@ -483,19 +483,23 @@ write.csv(data, "C:/Users/Laura/Documents/GitHub/fallstudien_2_projekt_1/predict
 
 ########################################## Feature Importance
 
-df1 <- data.frame(provider = rep(c("Vodafone", "T-Mobile", "O2"), each = 9),
+df1 <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
                  features = rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
                  value = abs(c(coeff$vodafone[-coeff$vodafone["intercept"]], coeff$tmobile[coeff$tmobile["intercept"]],
                            coeff$o2[-coeff$o2["intercept"]])))
-df1 <- df1[order(df1$value), ]
 
-ggplot(data = df1, aes(x = features, y = value, fill = provider)) +
+name_mapping = c(
+  " " = "Vodafone", 
+  "  " = "T-Mobile", 
+  "   " = "O2"
+)
+
+ggplot(data = df1, aes(x = reorder_within(features, -value, provider, sep = " "), y = value, fill = provider)) +
   geom_bar(stat = "identity" ) + 
-  facet_wrap(~ provider, scales = "free") +
+  facet_wrap(~ provider, scales = "free", labeller = as_labeller(name_mapping)) +
   theme_grey(base_size = 18) +
   theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
         legend.position = "none") +
-  scale_fill_hue(labels = c("O2", "T-Mobile", "Vodafone")) + 
   ggtitle("Feature Importance der verschiedenen Provider - Downlink") + 
   xlab("Features") + 
   ylab("Koeffizienten")

@@ -323,6 +323,9 @@ kennzahlen_final <- list("vodafone" = list(),
 predictions <- list("vodafone" = list(), 
                     "tmobile" = list(), 
                     "o2" = list())
+coeff <- list("vodafone" = list(), 
+              "tmobile" = list(), 
+              "o2" = list())
 
 for (provider in c("vodafone", "tmobile", "o2")){
   y <- ts(train[[provider]][, "throughput_mbits"])
@@ -330,6 +333,7 @@ for (provider in c("vodafone", "tmobile", "o2")){
   #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
   xreg <- data.matrix(xreg)
   arima_fit <- Arima(y = y, order = parameter[[provider]], xreg = xreg, method = "ML")
+  coeff[[provider]] <- arima_fit$coef[c("intercept",lm_features[-which(lm_features == "throughput_mbits")])]
   # predict
   y <- ts(test[[provider]][, "throughput_mbits"])
   xreg <- test[[provider]][, lm_features[-which(lm_features == "throughput_mbits")]]
@@ -455,6 +459,30 @@ ggplot(data = df, aes(x = kennzahl, y = value, fill = provider)) +
   ggtitle("Vergleich der Kennzahlen der verschiedenen Provider - Uplink") + 
   xlab("Kennzahlen") + 
   ylab("Wert")
+
+#--------------------FEATURE IMPORTANCE----------------------------------------#
+df1 <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
+                  features = rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
+                  value = abs(c(coeff$vodafone[-coeff$vodafone["intercept"]], 
+                                coeff$tmobile[coeff$tmobile["intercept"]],
+                                coeff$o2[-coeff$o2["intercept"]])))
+
+name_mapping = c(
+  " " = "Vodafone", 
+  "  " = "T-Mobile", 
+  "   " = "O2"
+)
+
+ggplot(data = df1, aes(x = reorder_within(features, -value, provider, sep = " "), y = value, fill = provider)) +
+  geom_bar(stat = "identity" ) + 
+  facet_wrap(~ provider, scales = "free", labeller = as_labeller(name_mapping)) +
+  theme_grey(base_size = 18) +
+  theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
+        legend.position = "none") +
+  ggtitle("Feature Importance der verschiedenen Provider - Downlink") + 
+  xlab("Features") + 
+  ylab("Koeffizienten")
+#------------------------------------------------------------------------------#
 
 
 data <- ul_data[c(ul_data$drive_id == 8 | ul_data$drive_id == 9 | ul_data$drive_id == 10),]
