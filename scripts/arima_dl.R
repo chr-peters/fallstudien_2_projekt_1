@@ -476,7 +476,7 @@ df1 <- data.frame(provider = rep(c("vodafone", "tmobile", "o2"), each = 9),
                            coeff$o2[-coeff$o2["intercept"]])))
 
 
-ggplot(data = df1, aes(x = reorder(features, -value), y = value), fill = provider) +
+ggplot(data = df1, aes(x = features, y = value), fill = provider) +
   geom_bar(stat = "identity" ) + 
   facet_wrap(~ provider, scales = "free") +
   theme_grey(base_size = 18) +
