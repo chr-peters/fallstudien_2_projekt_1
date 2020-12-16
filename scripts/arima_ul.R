@@ -20,9 +20,9 @@ library(tseries)
 setwd("~/GitHub/fallstudien_2_projekt_1/datasets")
 ul_data <- read.csv2("dataset_ul.csv", header=TRUE, sep=",", dec=".")
 ul_data <- na.omit(ul_data)
-ul_data$enodeb <- factor(ul_data$enodeb)
+#ul_data$enodeb <- factor(ul_data$enodeb)
 ul_data$scenario <- factor(ul_data$scenario)
-ul_data$ci <- as.factor(ul_data$ci)
+#ul_data$ci <- as.factor(ul_data$ci)
 
 ## Teile Daten nach Provider auf
 
@@ -159,7 +159,7 @@ grid_vodafone <- matrix(data = c(rep(0:max_ar, each=max_ma+1), rep(0, nrow), rep
                         nrow = nrow, ncol = 3)
 
 # O2
-# PACF 0 - 6
+# PACF 0 - 3
 # ACF 0 - 5
 
 max_ar <- 6
@@ -169,8 +169,8 @@ grid_o2 <- matrix(data = c(rep(0:max_ar, each=max_ma+1), rep(0, nrow), rep(0:max
                   nrow = nrow, ncol = 3)
 
 # TMobile
-# PACF 0 - 6
-# ACF 0 - 6
+# PACF 0 - 3
+# ACF 0 - 4
 
 max_ar <- 6
 max_ma <- 6
@@ -206,7 +206,10 @@ kennzahlen <- list("vodafone" = vodafone_kennzahlen,
 # Fahrten 3:7 jeweils Test - 1 -> 1:(test_id-1) Training
 
 
+
 for (provider in c("vodafone", "tmobile", "o2")){
+  #train[[provider]]$enodeb <- as.character(train[[provider]]$enodeb)
+  #test[[provider]]$enodeb <- as.character(test[[provider]]$enodeb)
   cv_train <- train[[provider]][
     train[[provider]]["drive_id"] == 1 | train[[provider]]["drive_id"] == 2, 
     lm_features
@@ -254,19 +257,19 @@ for (provider in c("vodafone", "tmobile", "o2")){
       ## fit model
       y <- ts(cv_train[, "throughput_mbits"]) # konstruiere Zeitreihe
       xreg <- cv_train[, lm_features[-which(lm_features == "throughput_mbits")]] 
-      xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
+      #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
       # Dummy codierung wenn nötig 
       xreg <- data.matrix(xreg)
       # konvertiere alle variablen zu numerischen variablen und 
       # Zusammenführen zu Spalten einer Matrix
-      arima_fit <- arima(x = y, order = grids[[provider]][row,], xreg = xreg, method = "ML")
+      arima_fit <- Arima(y = y, order = grids[[provider]][row,], xreg = xreg, method = "ML")
       # fitte ein Arima Modell (wobei d = 0)
       
       
       ## predict
       y <- ts(cv_test[, "throughput_mbits"])
       xreg <- cv_test[, lm_features[-which(lm_features == "throughput_mbits")]]
-      xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
+      #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
       xreg <- data.matrix(xreg)
       pred <- forecast(arima_fit, xreg = xreg)
       #res <- unclass(y) - unclass(pred$mean)
@@ -292,19 +295,19 @@ grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mae))[[1]], ]
 grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mse))[[1]], ]
 grids[["vodafone"]][which.max(rowMeans(kennzahlen$vodafone$rsquared))[[1]], ]
 grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$aic))[[1]], ]
-param_vodafone <- grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$aic))[[1]], ]
+param_vodafone <- grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mae))[[1]], ]
 
 grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mae))[[1]], ]
 grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mse))[[1]], ]
 grids[["tmobile"]][which.max(rowMeans(kennzahlen$tmobile$rsquared))[[1]], ]
 grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$aic))[[1]], ]
-param_tmobile <- grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$aic))[[1]], ]
+param_tmobile <- grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mae))[[1]], ]
 
 grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mae))[[1]], ]
 grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mse))[[1]], ]
 grids[["o2"]][which.max(rowMeans(kennzahlen$o2$rsquared))[[1]], ]
 grids[["o2"]][which.min(rowMeans(kennzahlen$o2$aic))[[1]], ]
-param_o2 <- grids[["o2"]][which.min(rowMeans(kennzahlen$o2$aic))[[1]], ]
+param_o2 <- grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mae))[[1]], ]
 
 parameter <- list("vodafone" = param_vodafone, 
                   "tmobile" = param_tmobile, 
@@ -348,7 +351,7 @@ for (provider in c("vodafone", "tmobile", "o2")){
 
 ## Plot
 
-provider <- "o2"
+provider <- "vodafone"
 
 ############################# Zeitreihenplot  
 
@@ -397,7 +400,7 @@ ggplot(
   facet_wrap(drive_id~scenario, 
              scales = "free", 
              ncol = 4, 
-             labeller = label_wrap_gen(multi_line=FALSE)) + 
+             labeller = label_wrap_gen(multi_line = FALSE)) + 
   ggtitle(paste(name_mapping[[provider]], "- Uplink", sep = " ")) + 
   xlab("Zeit") + 
   ylab("Datenübertragungsrate in MBit/s") +
@@ -433,13 +436,13 @@ ggplot(
 ######################## Barplot Vergleich Kennzahlen 
 
 
-df <- data.frame(provider = rep(c("vodafone", "tmobile", "o2"), each = 3),
-                 kennzahl = rep(c("MSE", "MAE", "R²"), 3),
-                 value = c(kennzahlen_final$vodafone$mse, kennzahlen_final$vodafone$mae,
+df <- data.frame(provider = rep(c("vodafone", "tmobile", "o2"), each = 2),
+                 kennzahl = rep(c("MAE", "R²"), 3),
+                 value = c(kennzahlen_final$vodafone$mae,
                            kennzahlen_final$vodafone$rsquared,
-                           kennzahlen_final$tmobile$mse, kennzahlen_final$tmobile$mae,
+                           kennzahlen_final$tmobile$mae,
                            kennzahlen_final$tmobile$rsquared,
-                           kennzahlen_final$o2$mse, kennzahlen_final$o2$mae,
+                           kennzahlen_final$o2$mae,
                            kennzahlen_final$o2$rsquared))
 
 ggplot(data = df, aes(x = kennzahl, y = value, fill = provider)) +
@@ -454,8 +457,12 @@ ggplot(data = df, aes(x = kennzahl, y = value, fill = provider)) +
   ylab("Wert")
 
 
+data <- ul_data[c(ul_data$drive_id == 8 | ul_data$drive_id == 9 | ul_data$drive_id == 10),]
+data$response_arima <- NA
+data[data$provider == "vodafone","response_arima"] <- predictions[["vodafone"]]$rescaled_forecast
+data[data$provider == "o2","response_arima"] <- predictions[["o2"]]$rescaled_forecast
+data[data$provider == "tmobile","response_arima"] <- predictions[["tmobile"]]$rescaled_forecast
 
-
-
+write.csv(data, "C:/Users/Alina/Documents/GitHub/fallstudien_2_projekt_1/prediction_results/predictions_arima_ul.csv")
 
 
