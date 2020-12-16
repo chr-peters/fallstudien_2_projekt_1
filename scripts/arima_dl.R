@@ -472,10 +472,14 @@ data$arima_upper_95 <- NA
 
 for (provider in c("vodafone", "tmobile", "o2")){
   data[data$provider == provider,"prediction_arima"] <- predictions[[provider]]$rescaled_forecast
-  data[data$provider == provider, "arima_lower_80"] <- predictions[[provider]]$lower[, "80%"]
-  data[data$provider == provider, "arima_lower_95"] <- predictions[[provider]]$lower[, "95%"]
-  data[data$provider == provider, "arima_upper_80"] <- predictions[[provider]]$upper[, "80%"]
-  data[data$provider == provider, "arima_upper_95"] <- predictions[[provider]]$upper[, "95%"]
+  data[data$provider == provider, "arima_lower_80"] <- predictions[[provider]]$lower[, "80%"]* attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
+    attr(train[[provider]], "scaled:center")["throughput_mbits"]
+  data[data$provider == provider, "arima_lower_95"] <- predictions[[provider]]$lower[, "95%"]* attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
+    attr(train[[provider]], "scaled:center")["throughput_mbits"]
+  data[data$provider == provider, "arima_upper_80"] <- predictions[[provider]]$upper[, "80%"]* attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
+    attr(train[[provider]], "scaled:center")["throughput_mbits"]
+  data[data$provider == provider, "arima_upper_95"] <- predictions[[provider]]$upper[, "95%"]* attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
+    attr(train[[provider]], "scaled:center")["throughput_mbits"]
   
 }
 write.csv(data, "C:/Users/Laura/Documents/GitHub/fallstudien_2_projekt_1/prediction_results/prediction_arima_dl.csv", row.names = FALSE)
