@@ -7,6 +7,7 @@ source(path)
 setwd("~/GitHub/fallstudien_2_projekt_1/prediction_results")
 data_ul <- read.csv("predictions_ul.csv", header=TRUE, sep=",", dec=".")
 data_dl <- read.csv("predictions_dl.csv", header=TRUE, sep=",", dec=".")
+linklifetime <- read.csv("predictions_xgboost_linklifetime.csv", header=TRUE, sep=",", dec=".")
 
 #-------------------------------ARIMA PREDICTIONS----------------------------#
 for (direction in c("uplink", "downlink")){
@@ -29,7 +30,15 @@ for (direction in c("uplink", "downlink")){
   plot_scatter(
     data = data, 
     direction = direction, 
-    model = "arima")
+    model = "arima", 
+    drive_id_colored = FALSE, 
+    filename = "scatter.png")
+  plot_scatter(
+    data = data, 
+    direction = direction, 
+    model = "arima", 
+    drive_id_colored = TRUE, 
+    filename = "scatter_colored.png")
 }
 
 #------------------------------XGBOOST PREDICTIONS---------------------------#
@@ -53,9 +62,30 @@ for (direction in c("uplink", "downlink")){
   plot_scatter(
     data = data, 
     direction = direction, 
-    model = "xgboost")
+    model = "xgboost", 
+    drive_id_colored = FALSE, 
+    filename = "scatter.png")
+  plot_scatter(
+    data = data, 
+    direction = direction, 
+    model = "xgboost", 
+    drive_id_colored = TRUE, 
+    filename = "scatter_colored.png")
 }
 
 
+#--------------------------LINK LIFETIME PREDICTIONS-------------------------ä
+for (provider in c("vodafone", "tmobile", "o2")){
+  plot_linklifetime_prediction(data = linklifetime, 
+                               provider = provider)
+                               
+}  
 
+#--------------------------LINK LIFETIME SCATTER-------------------------ä
+plot_linklifetime_scatter(data = linklifetime, 
+                          drive_id_colored = FALSE, 
+                          filename = "scatter.png")
+plot_linklifetime_scatter(data = linklifetime, 
+                          drive_id_colored = TRUE, 
+                          filename = "scatter_colored.png")
 
