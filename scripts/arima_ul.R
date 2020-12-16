@@ -459,9 +459,9 @@ ggplot(data = df, aes(x = kennzahl, y = value, fill = provider)) +
 
 data <- ul_data[c(ul_data$drive_id == 8 | ul_data$drive_id == 9 | ul_data$drive_id == 10),]
 data$response_arima <- NA
-data[data$provider == "vodafone","response_arima"] <- predictions[["vodafone"]]$rescaled_forecast
-data[data$provider == "o2","response_arima"] <- predictions[["o2"]]$rescaled_forecast
-data[data$provider == "tmobile","response_arima"] <- predictions[["tmobile"]]$rescaled_forecast
+data[data$provider == "vodafone","prediction_arima"] <- predictions[["vodafone"]]$rescaled_forecast
+data[data$provider == "o2","prediction_arima"] <- predictions[["o2"]]$rescaled_forecast
+data[data$provider == "tmobile","prediction_arima"] <- predictions[["tmobile"]]$rescaled_forecast
 
 write.csv(data, "C:/Users/Alina/Documents/GitHub/fallstudien_2_projekt_1/prediction_results/predictions_arima_ul.csv")
 
