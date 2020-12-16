@@ -458,11 +458,20 @@ ggplot(data = df, aes(x = kennzahl, y = value, fill = provider)) +
 
 
 data <- ul_data[c(ul_data$drive_id == 8 | ul_data$drive_id == 9 | ul_data$drive_id == 10),]
-data$response_arima <- NA
-data[data$provider == "vodafone","prediction_arima"] <- predictions[["vodafone"]]$rescaled_forecast
-data[data$provider == "o2","prediction_arima"] <- predictions[["o2"]]$rescaled_forecast
-data[data$provider == "tmobile","prediction_arima"] <- predictions[["tmobile"]]$rescaled_forecast
+data$prediction_arima <- NA
+data$arima_lower_80 <- NA
+data$arima_lower_95 <- NA
+data$arima_upper_80 <- NA
+data$arima_upper_95 <- NA
 
-write.csv(data, "C:/Users/Alina/Documents/GitHub/fallstudien_2_projekt_1/prediction_results/predictions_arima_ul.csv")
+for (provider in c("vodafone", "tmobile", "o2")){
+  data[data$provider == provider,"prediction_arima"] <- predictions[[provider]]$rescaled_forecast
+  data[data$provider == provider, "arima_lower_80"] <- predictions[[provider]]$lower[, "80%"]
+  data[data$provider == provider, "arima_lower_95"] <- predictions[[provider]]$lower[, "95%"]
+  data[data$provider == provider, "arima_upper_80"] <- predictions[[provider]]$upper[, "80%"]
+  data[data$provider == provider, "arima_upper_95"] <- predictions[[provider]]$upper[, "95%"]
+  
+}
+write.csv(data, "C:/Users/Laura/Documents/GitHub/fallstudien_2_projekt_1/prediction_results/predictions_arima_ul.csv")
 
 

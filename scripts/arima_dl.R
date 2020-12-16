@@ -1,4 +1,8 @@
-source("C:/Users/Alina/Documents/GitHub/fallstudien_2_projekt_1/scripts/arima_helpers.R")
+path <- paste("C:/Users/", 
+              Sys.getenv("USERNAME"), 
+              "/Documents/GitHub/fallstudien_2_projekt_1/scripts/arima_helpers.R", 
+              sep = "")
+source(path)
 library(forecast)
 library(fastDummies)
 library(dplyr)
@@ -461,29 +465,37 @@ ggplot(data = df, aes(x = kennzahl, y = value, fill = provider)) +
 
 data <- dl_data[c(dl_data$drive_id == 8 | dl_data$drive_id == 9 | dl_data$drive_id == 10),]
 data$prediction_arima <- NA
-data[data$provider == "vodafone","prediction_arima"] <- predictions[["vodafone"]]$rescaled_forecast
-data[data$provider == "o2","prediction_arima"] <- predictions[["o2"]]$rescaled_forecast
-data[data$provider == "tmobile","prediction_arima"] <- predictions[["tmobile"]]$rescaled_forecast
+data$arima_lower_80 <- NA
+data$arima_lower_95 <- NA
+data$arima_upper_80 <- NA
+data$arima_upper_95 <- NA
 
-write.csv(data, "C:/Users/Alina/Documents/GitHub/fallstudien_2_projekt_1/prediction_results/prediction_arima_dl.csv", row.names = FALSE)
+for (provider in c("vodafone", "tmobile", "o2")){
+  data[data$provider == provider,"prediction_arima"] <- predictions[[provider]]$rescaled_forecast
+  data[data$provider == provider, "arima_lower_80"] <- predictions[[provider]]$lower[, "80%"]
+  data[data$provider == provider, "arima_lower_95"] <- predictions[[provider]]$lower[, "95%"]
+  data[data$provider == provider, "arima_upper_80"] <- predictions[[provider]]$upper[, "80%"]
+  data[data$provider == provider, "arima_upper_95"] <- predictions[[provider]]$upper[, "95%"]
+  
+}
+write.csv(data, "C:/Users/Laura/Documents/GitHub/fallstudien_2_projekt_1/prediction_results/prediction_arima_dl.csv", row.names = FALSE)
 
 
 ########################################## Feature Importance
 
-df1 <- data.frame(provider = rep(c("vodafone", "tmobile", "o2"), each = 9),
+df1 <- data.frame(provider = rep(c("Vodafone", "T-Mobile", "O2"), each = 9),
                  features = rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
                  value = abs(c(coeff$vodafone[-coeff$vodafone["intercept"]], coeff$tmobile[coeff$tmobile["intercept"]],
                            coeff$o2[-coeff$o2["intercept"]])))
+df1 <- df1[order(df1$value), ]
 
-
-ggplot(data = df1, aes(x = features, y = value), fill = provider) +
+ggplot(data = df1, aes(x = features, y = value, fill = provider)) +
   geom_bar(stat = "identity" ) + 
   facet_wrap(~ provider, scales = "free") +
   theme_grey(base_size = 18) +
   theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
-        legend.position = "bottom", ) +
+        legend.position = "none") +
   scale_fill_hue(labels = c("O2", "T-Mobile", "Vodafone")) + 
   ggtitle("Feature Importance der verschiedenen Provider - Downlink") + 
   xlab("Features") + 
   ylab("Koeffizienten")
-
