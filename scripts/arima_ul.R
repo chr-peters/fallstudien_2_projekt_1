@@ -20,6 +20,9 @@ library(tseries)
 setwd("~/GitHub/fallstudien_2_projekt_1/datasets")
 ul_data <- read.csv2("dataset_ul.csv", header=TRUE, sep=",", dec=".")
 ul_data <- na.omit(ul_data)
+ul_data$enodeb <- factor(ul_data$enodeb)
+ul_data$scenario <- factor(ul_data$scenario)
+ul_data$ci <- as.factor(ul_data$ci)
 
 ## Teile Daten nach Provider auf
 
@@ -31,13 +34,13 @@ providers <- list("vodafone" = vodafone, "tmobile" = tmobile, "o2" = o2)
 ## Features
 # Nehme Features aus dem Paper (Vergleichbarkeit)
 
-features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db",
-              "cqi", "ta", "velocity_mps", "scenario", "drive_id", "ci")
+features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db", "rssnr_db", #"scenario"
+              "cqi", "ta", "velocity_mps", "drive_id", "enodeb")
 
 # Drive_Id soll nicht in das Modell, wird aber später gebraucht
 
-lm_features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db",
-                 "cqi", "ta", "velocity_mps", "scenario", "ci")
+lm_features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db", "rssnr_db", #"scenario"
+                 "cqi", "ta", "velocity_mps", "enodeb")
 
 ## Aufteilung der Daten in Training und Test
 
@@ -70,7 +73,7 @@ plot_acf(throughputs, type = "pacf",
 ## Test auf Stationarität: Augmented Dickey-Fuller Test
 
 for (j in c("vodafone", "o2", "tmobile")){
-  for (i in lm_features[-which(lm_features == "scenario" | lm_features == "ci")]){
+  for (i in numeric_features){
     adf.test(train[[j]][,i])$p.value
     print(adf.test(train[[j]][,i])$p.value)
   }
@@ -94,51 +97,26 @@ for (provider in c("vodafone", "tmobile", "o2")){
 
 ## Multikollinearität
 
-train[["vodafone"]]$scenario <- factor(train[["vodafone"]]$scenario)
 lm_vodafone <- lm(throughput_mbits ~ ., data = train[["vodafone"]][, lm_features])
 VIF(lm_vodafone)
 
-train[["tmobile"]]$scenario <- factor(train[["tmobile"]]$scenario)
 lm_tmobile <- lm(throughput_mbits ~ ., data = train[["tmobile"]][, lm_features])
 VIF(lm_tmobile)
 
-train[["o2"]]$scenario <- factor(train[["o2"]]$scenario)
 lm_o2 <- lm(throughput_mbits ~ ., data = train[["o2"]][, lm_features])
 VIF(lm_o2)
-
-# Korrelation zwischen Frequenz und Scenario bei o2 und tmobile sehr hoch
-# RSRQ lässt sich aus RSRP berechnen - Abhängigkeit
-
-# für Konsistenz: entferne f_mhz aus allen Modellen
-
-## ohne RSRQ und ohne Frequenz
-
-lm_features <- c("throughput_mbits", "payload_mb", "rsrp_dbm", 
-                 "cqi", "ta", "velocity_mps", "scenario", "ci")
-
-## Fitte nochmals die Modelle, ohne die beiden Features
-# res_provider beinhaltet die Residuen des Modells des jeweiligen Anbieters
-
-
-lm_vodafone <- lm(throughput_mbits ~ ., data = train[["vodafone"]][, lm_features])
-VIF(lm_vodafone)
-res_vodafone <- data.frame(res = rstandard(lm_vodafone), provider = "Vodafone")
-
-
-lm_tmobile <- lm(throughput_mbits ~ ., data = train[["tmobile"]][, lm_features])
-VIF(lm_tmobile)
-res_tmobile <- data.frame(res = rstandard(lm_tmobile), provider = "T-Mobile")
-
-
-lm_o2 <- lm(throughput_mbits ~ ., data = train[["o2"]][, lm_features])
-VIF(lm_o2)
-res_o2 <- data.frame(res = rstandard(lm_o2), provider = "O2")
 
 ## Überprüfen der Normalverteilungsannahme der Residuen
 
-# qq-Plots
+res_tmobile <- data.frame(res = rstandard(lm_tmobile), provider = "T-Mobile")
+res_vodafone <- data.frame(res = rstandard(lm_vodafone), provider = "Vodafone")
+res_o2 <- data.frame(res = rstandard(lm_o2), provider = "O2")
 
 res_data <- rbind(res_vodafone, res_tmobile, res_o2)
+
+
+# qq-Plots
+
 ggplot(res_data, aes(sample=res)) + geom_qq() + 
   geom_abline(intercept = 0, slope = 1, color = "red", size = 1, alpha = 0.8) + 
   facet_wrap(~provider) + ggtitle("QQ-Plots Normalverteilung - Uplink") + 
@@ -172,30 +150,30 @@ plot_acf(plot_data, type = "pacf",
 
 # Vodafone
 # PACF 0 - 2
-# ACF 0 - 5
+# ACF 0 - 4 
 
 max_ar <- 2
-max_ma <- 5
+max_ma <- 4 
 nrow = (max_ar+1)*(max_ma+1)
 grid_vodafone <- matrix(data = c(rep(0:max_ar, each=max_ma+1), rep(0, nrow), rep(0:max_ma, max_ar+1)), 
                         nrow = nrow, ncol = 3)
 
 # O2
-# PACF 0 - 3
+# PACF 0 - 6
 # ACF 0 - 5
 
-max_ar <- 3
+max_ar <- 6
 max_ma <- 5
 nrow = (max_ar+1)*(max_ma+1)
 grid_o2 <- matrix(data = c(rep(0:max_ar, each=max_ma+1), rep(0, nrow), rep(0:max_ma, max_ar+1)), 
                   nrow = nrow, ncol = 3)
 
 # TMobile
-# PACF 0 - 3
-# ACF 0 - 10
+# PACF 0 - 6
+# ACF 0 - 6
 
-max_ar <- 3
-max_ma <- 10
+max_ar <- 6
+max_ma <- 6
 nrow = (max_ar+1)*(max_ma+1)
 grid_tmobile <- matrix(data = c(rep(0:max_ar, each=max_ma+1), rep(0, nrow), rep(0:max_ma, max_ar+1)), 
                        nrow = nrow, ncol = 3)
@@ -281,7 +259,7 @@ for (provider in c("vodafone", "tmobile", "o2")){
       xreg <- data.matrix(xreg)
       # konvertiere alle variablen zu numerischen variablen und 
       # Zusammenführen zu Spalten einer Matrix
-      arima_fit <- Arima(y = y, order = grids[[provider]][row,], xreg = xreg, method = "ML")
+      arima_fit <- arima(x = y, order = grids[[provider]][row,], xreg = xreg, method = "ML")
       # fitte ein Arima Modell (wobei d = 0)
       
       
@@ -314,19 +292,19 @@ grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mae))[[1]], ]
 grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mse))[[1]], ]
 grids[["vodafone"]][which.max(rowMeans(kennzahlen$vodafone$rsquared))[[1]], ]
 grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$aic))[[1]], ]
-param_vodafone <- grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mse))[[1]], ]
+param_vodafone <- grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$aic))[[1]], ]
 
 grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mae))[[1]], ]
 grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mse))[[1]], ]
 grids[["tmobile"]][which.max(rowMeans(kennzahlen$tmobile$rsquared))[[1]], ]
 grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$aic))[[1]], ]
-param_tmobile <- grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mse))[[1]], ]
+param_tmobile <- grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$aic))[[1]], ]
 
 grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mae))[[1]], ]
 grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mse))[[1]], ]
 grids[["o2"]][which.max(rowMeans(kennzahlen$o2$rsquared))[[1]], ]
 grids[["o2"]][which.min(rowMeans(kennzahlen$o2$aic))[[1]], ]
-param_o2 <- grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mse))[[1]], ]
+param_o2 <- grids[["o2"]][which.min(rowMeans(kennzahlen$o2$aic))[[1]], ]
 
 parameter <- list("vodafone" = param_vodafone, 
                   "tmobile" = param_tmobile, 
@@ -346,13 +324,13 @@ predictions <- list("vodafone" = list(),
 for (provider in c("vodafone", "tmobile", "o2")){
   y <- ts(train[[provider]][, "throughput_mbits"])
   xreg <- train[[provider]][, lm_features[-which(lm_features == "throughput_mbits")]]
-  xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
+  #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
   xreg <- data.matrix(xreg)
   arima_fit <- Arima(y = y, order = parameter[[provider]], xreg = xreg, method = "ML")
   # predict
   y <- ts(test[[provider]][, "throughput_mbits"])
   xreg <- test[[provider]][, lm_features[-which(lm_features == "throughput_mbits")]]
-  xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
+  #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
   xreg <- data.matrix(xreg)
   predictions[[provider]] <- forecast(arima_fit, xreg = xreg) 
   predictions[[provider]]$rescaled_forecast <- predictions[[provider]]$mean * attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
@@ -370,19 +348,19 @@ for (provider in c("vodafone", "tmobile", "o2")){
 
 ## Plot
 
-provider <- "vodafone"
+provider <- "o2"
 
 ############################# Zeitreihenplot  
 
 actual <- data.frame(
-  value = dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
+  value = ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
                   "throughput_mbits"], 
   type = "actual", 
-  timestamp = anytime(dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
+  timestamp = anytime(ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
                               "timestamp_ms"]),
-  drive_id = dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
+  drive_id = ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
                      "drive_id"], 
-  scenario = dl_data[(dl_data["drive_id"] == 8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
+  scenario = ul_data[(ul_data["drive_id"] == 8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
                      "scenario"],
   upper = unclass(predictions[[provider]]$upper[,"80%"] * attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
                     attr(train[[provider]], "scaled:center")["throughput_mbits"]),
@@ -392,11 +370,11 @@ actual <- data.frame(
 vorhersage <- data.frame(
   value = predictions[[provider]]$rescaled_forecast, 
   type = "predict", 
-  timestamp = anytime(dl_data[(dl_data["drive_id"]==8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
+  timestamp = anytime(ul_data[(ul_data["drive_id"]==8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
                               "timestamp_ms"]),
-  drive_id = dl_data[(dl_data["drive_id"]==8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
+  drive_id = ul_data[(ul_data["drive_id"]==8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
                      "drive_id"], 
-  scenario = dl_data[(dl_data["drive_id"]==8 | dl_data["drive_id"] == 9 | dl_data["drive_id"] == 10) & dl_data["provider"] == provider, 
+  scenario = ul_data[(ul_data["drive_id"]==8 | ul_data["drive_id"] == 9 | ul_data["drive_id"] == 10) & ul_data["provider"] == provider, 
                      "scenario"],
   upper = unclass(predictions[[provider]]$upper[,"80%"])* attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
     attr(train[[provider]], "scaled:center")["throughput_mbits"],
@@ -428,7 +406,7 @@ ggplot(
         legend.title = element_blank()) +
   scale_color_hue(labels = c("Beobachtung", "Vorhersage mit 80% KI"))
 
-######################### Scatterplot #funktioniert nicht bei o2
+######################### Scatterplot 
 
 plot_data <- data.frame(actual = actual$value, 
                         predict = vorhersage$value)
