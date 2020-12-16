@@ -450,8 +450,7 @@ ggplot(data = df, aes(x = kennzahl, y = value, fill = provider)) +
   xlab("Kennzahlen") + 
   ylab("Wert")
 
-  
-# TODO: Warum schlägt der MSE und MAE bei o2 so aus?
+############################################# Predicitons to csv
 
 data <- dl_data[c(dl_data$drive_id == 8 | dl_data$drive_id == 9 | dl_data$drive_id == 10),]
 data$prediction_arima <- NA
