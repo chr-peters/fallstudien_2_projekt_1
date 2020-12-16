@@ -307,7 +307,10 @@ param_o2 <- grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mae))[[1]], ]
 parameter <- list("vodafone" = param_vodafone, 
                   "tmobile" = param_tmobile, 
                   "o2" = param_o2)
-print(parameter)
+print(parameter) 
+# vodafone 106
+# tmobile 000
+# o2 000
 
 ## Modell für den kompletten Trainingsdatensatz fitten und für Test predicten
 ## Predictions zurücktransformieren
@@ -318,13 +321,17 @@ kennzahlen_final <- list("vodafone" = list(),
 predictions <- list("vodafone" = list(), 
                     "tmobile" = list(), 
                     "o2" = list())
+coeff <- list("vodafone" = list(), 
+                     "tmobile" = list(), 
+                     "o2" = list())
 
-for (provider in c("vodafone", "tmobile", "o2")){
+for (provider in c("tmobile", "o2", "vodafone")){
   y <- ts(train[[provider]][, "throughput_mbits"])
   xreg <- train[[provider]][, lm_features[-which(lm_features == "throughput_mbits")]]
   #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
   xreg <- data.matrix(xreg)
   arima_fit <- Arima(y = y, order = parameter[[provider]], xreg = xreg, method = "ML")
+  coeff[[provider]] <- arima_fit$coef[c("intercept",lm_features[-which(lm_features == "throughput_mbits")])]
   # predict
   y <- ts(test[[provider]][, "throughput_mbits"])
   xreg <- test[[provider]][, lm_features[-which(lm_features == "throughput_mbits")]]
@@ -346,7 +353,7 @@ for (provider in c("vodafone", "tmobile", "o2")){
 
 ## Plot
 
-provider <- "o2"
+provider <- "vodafone"
   
 ############################# Zeitreihenplot  
   
@@ -461,4 +468,22 @@ data[data$provider == "tmobile","prediction_arima"] <- predictions[["tmobile"]]$
 write.csv(data, "C:/Users/Alina/Documents/GitHub/fallstudien_2_projekt_1/prediction_results/prediction_arima_dl.csv", row.names = FALSE)
 
 
+########################################## Feature Importance
+
+df1 <- data.frame(provider = rep(c("vodafone", "tmobile", "o2"), each = 9),
+                 features = rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
+                 value = abs(c(coeff$vodafone[-coeff$vodafone["intercept"]], coeff$tmobile[coeff$tmobile["intercept"]],
+                           coeff$o2[-coeff$o2["intercept"]])))
+
+
+ggplot(data = df1, aes(x = reorder(features, -value), y = value), fill = provider) +
+  geom_bar(stat = "identity" ) + 
+  facet_wrap(~ provider, scales = "free") +
+  theme_grey(base_size = 18) +
+  theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
+        legend.position = "bottom", ) +
+  scale_fill_hue(labels = c("O2", "T-Mobile", "Vodafone")) + 
+  ggtitle("Feature Importance der verschiedenen Provider - Downlink") + 
+  xlab("Features") + 
+  ylab("Koeffizienten")
 
