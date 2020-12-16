@@ -23,7 +23,7 @@ library(mlr3filters)
 library(paradox)
 ```
 
-```{r}
+```{r, results = "hide"}
 future::plan("multiprocess")
 ```
 
@@ -226,11 +226,26 @@ get_tuning_result = function(task, dataset, grid_resolution, n_evals) {
 ```
 
 ```{r, results = "hide"}
-tuning_result_ul_o2 = get_tuning_result(task_ul_o2, dataset_ul, grid_resolution = 20, n_evals = 10)
+tuning_evals_ul = 50
 
-tuning_result_ul_tmobile = get_tuning_result(task_ul_tmobile, dataset_ul, grid_resolution = 20, n_evals = 10)
-
-tuning_result_ul_vodafone = get_tuning_result(task_ul_vodafone, dataset_ul, grid_resolution = 20, n_evals = 10)
+tuning_result_ul_o2 = get_tuning_result(
+  task_ul_o2,
+  dataset_ul,
+  grid_resolution = 20,
+  n_evals = tuning_evals_ul
+)
+tuning_result_ul_tmobile = get_tuning_result(
+  task_ul_tmobile,
+  dataset_ul,
+  grid_resolution = 20,
+  n_evals = tuning_evals_ul
+)
+tuning_result_ul_vodafone = get_tuning_result(
+  task_ul_vodafone,
+  dataset_ul,
+  grid_resolution = 20,
+  n_evals = tuning_evals_ul
+)
 ```
 
 ```{r}
@@ -324,7 +339,7 @@ validation_results_ul = validation_results_ul %>%
   rename(prediction_xgboost=response) %>% 
   select(-truth, -row_id, -row_name)
 
-# write_csv(validation_results_ul, str_c(results_dir, "predictions_xgboost_ul.csv"))
+write_csv(validation_results_ul, str_c(results_dir, "predictions_xgboost_ul.csv"))
 ```
 
 ### Scatter Plots
@@ -378,15 +393,6 @@ importance_ul = bind_rows(
 ) %>% filter(!str_starts(Feature, "enodeb"))
 ```
 
-```{r}
-ggplot(importance_ul) +
-  geom_bar(position = "dodge", aes(x = Feature, y = Gain, fill = provider), stat="identity") +
-  xlab("feature") +
-  ylab("Gain") +
-  scale_x_discrete(guide = guide_axis(angle = 20)) +
-  ggtitle("XGBoost Gain Feature Importance for Upload-Rate Prediction")
-```
-
 ### Permutation
 
 ```{r}
@@ -405,7 +411,7 @@ uninstantiate_resampling = function(resampling) {
 ```
 
 ```{r, results='hide'}
-num_permutation_sims_ul = 1
+num_permutation_sims_ul = 5
 
 filter_permutation_o2_ul = flt("permutation",
   learner = learner_ul_o2$clone(),
@@ -451,12 +457,11 @@ permutation_ul = bind_rows(
 ```
 
 ```{r}
-ggplot(permutation_ul) +
-  geom_bar(position = "dodge", aes(x = feature, y = score, fill = provider), stat="identity") +
-  xlab("feature") +
-  ylab("MAE difference") +
-  scale_x_discrete(guide = guide_axis(angle = 20)) +
-  ggtitle("Permutation Feature Importance for Upload-Rate Prediction")
+permutation_ul %>% 
+  left_join(importance_ul, by=c("feature"="Feature", "provider")) %>% 
+  select(provider, feature, score, Gain) %>% 
+  rename(Permutation = score) %>%
+  write_csv(str_c(results_dir, "feature_importance_xgboost_ul.csv"))
 ```
 
 
@@ -519,11 +524,26 @@ task_dl_vodafone
 ## Parameter Tuning
 
 ```{r, results = "hide"}
-tuning_result_dl_o2 = get_tuning_result(task_dl_o2, dataset_dl, grid_resolution = 20, n_evals = 10)
+tuning_evals_dl = 50
 
-tuning_result_dl_tmobile = get_tuning_result(task_dl_tmobile, dataset_dl, grid_resolution = 20, n_evals = 10)
-
-tuning_result_dl_vodafone = get_tuning_result(task_dl_vodafone, dataset_dl, grid_resolution = 20, n_evals = 10)
+tuning_result_dl_o2 = get_tuning_result(
+  task_dl_o2,
+  dataset_dl,
+  grid_resolution = 20,
+  n_evals = tuning_evals_dl
+)
+tuning_result_dl_tmobile = get_tuning_result(
+  task_dl_tmobile,
+  dataset_dl,
+  grid_resolution = 20,
+  n_evals = tuning_evals_dl
+)
+tuning_result_dl_vodafone = get_tuning_result(
+  task_dl_vodafone,
+  dataset_dl,
+  grid_resolution = 20,
+  n_evals = tuning_evals_dl
+)
 ```
 
 ```{r}
@@ -617,7 +637,7 @@ validation_results_dl = validation_results_dl %>%
   rename(prediction_xgboost=response) %>% 
   select(-truth, -row_id, -row_name)
 
-# write_csv(validation_results_dl, str_c(results_dir, "predictions_xgboost_dl.csv"))
+write_csv(validation_results_dl, str_c(results_dir, "predictions_xgboost_dl.csv"))
 ```
 
 ### Scatter Plots
@@ -671,19 +691,10 @@ importance_dl = bind_rows(
 ) %>% filter(!str_starts(Feature, "enodeb"))
 ```
 
-```{r}
-ggplot(importance_dl) +
-  geom_bar(position = "dodge", aes(x = Feature, y = Gain, fill = provider), stat="identity") +
-  xlab("feature") +
-  ylab("Gain") +
-  scale_x_discrete(guide = guide_axis(angle = 20)) +
-  ggtitle("XGBoost Gain Feature Importance for Download-Rate Prediction")
-```
-
 ### Permutation
 
 ```{r, results='hide'}
-num_permutation_sims_dl = 1
+num_permutation_sims_dl = 5
 
 filter_permutation_o2_dl = flt("permutation",
   learner = learner_dl_o2$clone(),
@@ -729,12 +740,11 @@ permutation_dl = bind_rows(
 ```
 
 ```{r}
-ggplot(permutation_dl) +
-  geom_bar(position = "dodge", aes(x = feature, y = score, fill = provider), stat="identity") +
-  xlab("feature") +
-  ylab("MAE difference") +
-  scale_x_discrete(guide = guide_axis(angle = 20)) +
-  ggtitle("Permutation Feature Importance for Download-Rate Prediction")
+permutation_dl %>% 
+  left_join(importance_dl, by=c("feature"="Feature", "provider")) %>% 
+  select(provider, feature, score, Gain) %>% 
+  rename(Permutation = score) %>%
+  write_csv(str_c(results_dir, "feature_importance_xgboost_dl.csv"))
 ```
 
 
@@ -797,11 +807,28 @@ task_linklifetime_vodafone
 ## Parameter Tuning
 
 ```{r, results = "hide"}
-tuning_result_linklifetime_o2 = get_tuning_result(task_linklifetime_o2, dataset_linklifetime, grid_resolution = 20, n_evals = 10)
+tuning_evals_linklifetime = 50
 
-tuning_result_linklifetime_tmobile = get_tuning_result(task_linklifetime_tmobile, dataset_linklifetime, grid_resolution = 20, n_evals = 10)
+tuning_result_linklifetime_o2 = get_tuning_result(
+  task_linklifetime_o2,
+  dataset_linklifetime,
+  grid_resolution = 20,
+  n_evals = tuning_evals_linklifetime
+)
 
-tuning_result_linklifetime_vodafone = get_tuning_result(task_linklifetime_vodafone, dataset_linklifetime, grid_resolution = 20, n_evals = 10)
+tuning_result_linklifetime_tmobile = get_tuning_result(
+  task_linklifetime_tmobile,
+  dataset_linklifetime,
+  grid_resolution = 20,
+  n_evals = tuning_evals_linklifetime
+)
+
+tuning_result_linklifetime_vodafone = get_tuning_result(
+  task_linklifetime_vodafone,
+  dataset_linklifetime,
+  grid_resolution = 20,
+  n_evals = tuning_evals_linklifetime
+)
 ```
 
 ```{r}
@@ -895,7 +922,7 @@ validation_results_linklifetime = validation_results_linklifetime %>%
   rename(prediction_xgboost=response) %>% 
   select(-truth, -row_id, -row_name)
 
-# write_csv(validation_results_linklifetime, str_c(results_dir, "predictions_xgboost_linklifetime.csv"))
+write_csv(validation_results_linklifetime, str_c(results_dir, "predictions_xgboost_linklifetime.csv"))
 ```
 
 ### Scatter Plots
@@ -951,19 +978,10 @@ importance_linklifetime = bind_rows(
 ) %>% filter(!str_starts(Feature, "enodeb"))
 ```
 
-```{r}
-ggplot(importance_linklifetime) +
-  geom_bar(position = "dodge", aes(x = Feature, y = Gain, fill = provider), stat="identity") +
-  xlab("feature") +
-  ylab("Gain") +
-  scale_x_discrete(guide = guide_axis(angle = 20)) +
-  ggtitle("XGBoost Gain Feature Importance for Link-Lifetime Prediction")
-```
-
 ### Permutation
 
 ```{r, results='hide'}
-num_permutation_sims_linklifetime = 1
+num_permutation_sims_linklifetime = 5
 
 filter_permutation_o2_linklifetime = flt("permutation",
   learner = learner_linklifetime_o2$clone(),
@@ -1009,10 +1027,9 @@ permutation_linklifetime = bind_rows(
 ```
 
 ```{r}
-ggplot(permutation_linklifetime) +
-  geom_bar(position = "dodge", aes(x = feature, y = score, fill = provider), stat="identity") +
-  xlab("feature") +
-  ylab("MAE difference") +
-  scale_x_discrete(guide = guide_axis(angle = 20)) +
-  ggtitle("Permutation Feature Importance for Link-Lifetime Prediction")
+permutation_linklifetime %>% 
+  left_join(importance_linklifetime, by=c("feature"="Feature", "provider")) %>% 
+  select(provider, feature, score, Gain) %>% 
+  rename(Permutation = score) %>%
+  write_csv(str_c(results_dir, "feature_importance_xgboost_linklifetime.csv"))
 ```
