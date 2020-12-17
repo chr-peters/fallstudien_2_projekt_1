@@ -1,5 +1,5 @@
 
-
+#--------------------KENNZAHLEN VERGLEICH XGBOOST/ARIMA TASK I----------------------------------------#
 setwd("~/GitHub/fallstudien_2_projekt_1/prediction_results")
 
 data_ul <- read.csv("predictions_ul.csv", header=TRUE, sep=",", dec=".")
@@ -46,7 +46,8 @@ for (provider in c("vodafone", "tmobile", "o2")){
 }
 
 ## UL
-df_ul <- data.frame(model = rep(c("XGBoost", "LM+Arima"), each = 6),
+
+df_ul <- data.frame(model = rep(c("XGBoost", "ARIMA"), each = 6),
                  provider = rep(c("Vodafone", "T-Mobile", "O2"), 4),
                  kennzahl = c(rep(c("MAE", "R²"), each = 3),rep(c("MAE", "R²"), each = 3)),
                  value = c(kennzahlen_ul_xgboost$vodafone$mae,
@@ -74,7 +75,7 @@ ggplot(data = df_ul, aes(x = model, y = value, fill = model) )+
 
 ## DL
 
-df_dl <- data.frame(model = rep(c("XGBoost", "LM+Arima"), each = 6),
+df_dl <- data.frame(model = rep(c("XGBoost", "ARIMA"), each = 6),
                  provider = rep(c("Vodafone", "T-Mobile", "O2"), 4),
                  kennzahl = c(rep(c("MAE", "R²"), each = 3),rep(c("MAE", "R²"), each = 3)),
                  value = c(kennzahlen_dl_xgboost$vodafone$mae,
@@ -99,6 +100,77 @@ ggplot(data = df_dl, aes(x = model, y = value, fill = model) )+
   ggtitle("Vergleich der Kennzahlen der verschiedenen Modelle - Downlink") + 
   xlab("Modelle") + 
   ylab("Wert")
+
+
+#--------------------KENNZAHLEN XGBOOST LINK LIFETIME TASK II----------------------------------------#
+
+setwd("~/GitHub/fallstudien_2_projekt_1/prediction_results")
+data_kenn <- read.csv("predictions_xgboost_linklifetime.csv", header = TRUE)
+
+kennzahlen_ll_xgboost <- list("vodafone" = list(), 
+                              "tmobile" = list(), 
+                              "o2" = list())
+
+for (provider in c("o2", "tmobile", "vodafone")){
+  prediction <- data_kenn[data_kenn$provider == provider,"prediction_xgboost"]
+  link_lt <- data_kenn[data_kenn$provider == provider,"link_lifetime"]
+  kennzahlen_ll_xgboost[[provider]]$mae <- mae(prediction, link_lt)
+  kennzahlen_ll_xgboost[[provider]]$rsquared <- 1 - sum((prediction-link_lt)^2)/
+    sum((mean(link_lt)-link_lt)^2)
+}
+
+
+
+
+df <- data.frame(provider = rep(c("vodafone", "tmobile", "o2"), each = 2),
+                 kennzahl = rep(c("MAE", "R²"), 3),
+                 value = c(kennzahlen_ll_xgboost$vodafone$mae,
+                           kennzahlen_ll_xgboost$vodafone$rsquared,
+                           kennzahlen_ll_xgboost$tmobile$mae,
+                           kennzahlen_ll_xgboost$tmobile$rsquared,
+                           kennzahlen_ll_xgboost$o2$mae,
+                           kennzahlen_ll_xgboost$o2$rsquared))
+
+ggplot(data = df, aes(x = kennzahl, y = value, fill = provider)) +
+  geom_bar(stat = "identity", position = position_dodge()) + 
+  facet_wrap(~ kennzahl, scales = "free") +
+  theme_grey(base_size = 18) +
+  theme(legend.title = element_blank(), 
+        legend.position = "bottom") +
+  scale_fill_hue(labels = c("O2", "T-Mobile", "Vodafone")) + 
+  ggtitle("Vergleich der Kennzahlen der verschiedenen Provider - Link-Liftime") + 
+  xlab("Kennzahlen") + 
+  ylab("Wert")
+
+#--------------------FEATURE IMPORTANCE XGBOOST LINK LIFETIME TASK II----------------------------------------#
+
+setwd("~/GitHub/fallstudien_2_projekt_1/prediction_results")
+
+data <- read.csv("feature_importance_xgboost_linklifetime.csv", header = TRUE)
+
+
+df_ll <- data.frame(provider = rep(c(" ", "  ", "   "), each = 8),
+                    #features = data$feature[-which(c(data$feature == "enodeb"))],
+                    features = data$feature[-which(c(data$feature == "enodeb"))],
+                    #value = data$Gain[-which(c(data$feature == "enodeb"))])
+                    value = abs(data$Permutation[-which(c(data$feature == "enodeb"))]))
+
+name_mapping = c(
+  " " = "O2", 
+  "  " = "T-Mobile", 
+  "   " = "Vodafone"
+)
+
+ggplot(data = df_ll, aes(x = reorder_within(features, -value, provider, sep = " "), y = value, fill = provider)) +
+  geom_bar(stat = "identity" ) + 
+  facet_wrap(~ provider, scales = "free", labeller = as_labeller(name_mapping)) +
+  theme_grey(base_size = 18) +
+  theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
+        legend.position = "none") +
+  ggtitle("Feature Importance der verschiedenen Provider - Link-Lifetime") + 
+  xlab("Features") + 
+  ylab("Koeffizienten")
+
 
 
 
