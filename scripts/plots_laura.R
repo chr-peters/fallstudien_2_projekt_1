@@ -27,18 +27,18 @@ for (direction in c("uplink", "downlink")){
 for (direction in c("uplink", "downlink")){
   if (direction == "uplink") data = data_ul
   else data = data_dl
-  plot_scatter(
-    data = data, 
-    direction = direction, 
-    model = "arima", 
-    drive_id_colored = FALSE, 
-    filename = "scatter.png")
+  # plot_scatter(
+  #   data = data, 
+  #   direction = direction, 
+  #   model = "arima", 
+  #   drive_id_colored = FALSE, 
+  #   filename = "scatter.png")
   plot_scatter(
     data = data, 
     direction = direction, 
     model = "arima", 
     drive_id_colored = TRUE, 
-    filename = "scatter_colored.png")
+    filename = "scatter_colored_axes_fixed.png")
 }
 
 #------------------------------XGBOOST PREDICTIONS---------------------------#

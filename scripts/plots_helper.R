@@ -114,7 +114,7 @@ plot_scatter <- function(data,
     ) + 
       geom_abline(color = "red", intercept = 0, slope = 1) +
       facet_grid(provider ~ scenario, 
-                 scales = "free_y", 
+                 #scales = "free_y", 
                  labeller = label_wrap_gen(multi_line=FALSE)) + 
       ggtitle(paste("Scatterplot der Beobachtungen und der Vorhersagen:", 
                     name_mapping[[direction]], sep = " ")) + 
