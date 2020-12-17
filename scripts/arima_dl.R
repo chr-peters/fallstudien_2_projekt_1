@@ -543,11 +543,11 @@ coeff$vodafone[-which(names(coeff$vodafone) == "intercept")] <- abs(coeff$vodafo
 
 df_dl_both <- data.frame(provider = c(rep(c("O2", "T-Mobile", "Vodafone"), each = 9),rep(c("O2", "T-Mobile", "Vodafone"), each = 9)),
                          features = c(rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
-                                      uldata$feature),
+                                      dldata$feature),
                          value = abs(c(coeff$o2[-which(names(coeff$o2) == "intercept")], 
                                        coeff$tmobile[-which(names(coeff$tmobile) == "intercept")],
                                        coeff$vodafon[-which(names(coeff$vodafone) == "intercept")],
-                                       uldata$Permutation)),
+                                       dldata$Permutation)),
                          model = c(rep("ARIMA", 27), rep("XGBoost", 27)))
 
 
@@ -562,6 +562,6 @@ ggplot(data = df_dl_both, aes(x = features, y = value, fill = provider)) +
   theme_grey(base_size = 18) +
   theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
         legend.position = "none") +
-  ggtitle("Feature Importance der verschiedenen Provider - Downlink") + 
+  ggtitle("Feature Importance Modellvergleich - Downlink") + 
   xlab("Features") + 
-  ylab("Koeffizienten")
+  ylab("Wichtigkeit")

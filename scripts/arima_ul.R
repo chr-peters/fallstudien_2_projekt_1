@@ -313,7 +313,10 @@ param_o2 <- grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mae))[[1]], ]
 parameter <- list("vodafone" = param_vodafone, 
                   "tmobile" = param_tmobile, 
                   "o2" = param_o2)
-print(parameter)
+print(parameter) 
+# 202
+# 000
+# 000
 
 ## Modell für den kompletten Trainingsdatensatz fitten und für Test predicten
 ## Predictions zurücktransformieren
@@ -493,7 +496,6 @@ uldata <- read.csv("feature_importance_xgboost_ul.csv", header = TRUE)
 #   ylab("Wert")
 
 # Normieren
-# xgboost
 
 for (provider in c("o2", "tmobile", "vodafone")){
   
@@ -512,7 +514,7 @@ coeff$tmobile[-which(names(coeff$tmobile) == "intercept")] <- abs(coeff$tmobile[
 coeff$vodafone[-which(names(coeff$vodafone) == "intercept")] <- abs(coeff$vodafone[-which(names(coeff$vodafone) == "intercept")])/
   sum(abs(coeff$vodafone[-which(names(coeff$vodafone) == "intercept")]))
 
-
+#daten
 
 df_ul_both <- data.frame(provider = c(rep(c("O2", "T-Mobile", "Vodafone"), each = 9),rep(c("O2", "T-Mobile", "Vodafone"), each = 9)),
                   features = c(rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
@@ -523,7 +525,7 @@ df_ul_both <- data.frame(provider = c(rep(c("O2", "T-Mobile", "Vodafone"), each 
                             uldata$Permutation)),
                   model = c(rep("ARIMA", 27), rep("XGBoost", 27)))
 
-
+#plot
 name_mapping = list(
   "o2" = "O2",
   "tmobile" = "T-Mobile", 
@@ -535,9 +537,9 @@ ggplot(data = df_ul_both, aes(x = features, y = value, fill = provider)) +
   theme_grey(base_size = 18) +
   theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
         legend.position = "none") +
-  ggtitle("Feature Importance der verschiedenen Provider - Uplink") + 
+  ggtitle("Feature Importance Modellvergleich - Uplink") + 
   xlab("Features") + 
-  ylab("Koeffizienten")
+  ylab("Wichtigkeit")
 
 
 
