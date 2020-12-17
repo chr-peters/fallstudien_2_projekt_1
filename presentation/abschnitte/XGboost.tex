@@ -1,7 +1,21 @@
 \subsection{Extreme Gradient Boosting}
 
 \begin{frame}{Extreme Gradient Boosting}
-    Intro
+    \begin{itemize}
+        \item Additives Training eines Ensembles aus  \glqq schwachen \grqq{} Lernern
+        \begin{itemize}
+            \item[$\Rightarrow$] In unserem Fall einfache CART-B\"aume
+        \end{itemize}
+        \item Jeder neue Baum versucht, die Schw\"achen seiner Vorg\"anger auszugleichen
+        \begin{itemize}
+            \item[$\Rightarrow$] Mit jedem neuen Baum sinkt der Training-Error
+        \end{itemize}
+        \item Implementiert in \textit{XGBoost} Bibliothek
+        \begin{itemize}
+            \item Sehr gut skalierbar, funktioniert noch problemlos mit mehreren Milliarden Samples
+            \item L\"asst sich aber auch hervorragend auf ressourcenbegrenzten Systemen einsetzen \cite{XGBoost}
+        \end{itemize}
+    \end{itemize}
 \end{frame}
 
 \begin{frame}{Features}
