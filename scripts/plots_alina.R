@@ -153,11 +153,11 @@ setwd("~/GitHub/fallstudien_2_projekt_1/prediction_results")
 data <- read.csv("feature_importance_xgboost_linklifetime.csv", header = TRUE)
 
 
-df_ll <- data.frame(provider = rep(c(" ", "  ", "   "), each = 8),
+df_ll <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
                     #features = data$feature[-which(c(data$feature == "enodeb"))],
-                    features = data$feature[-which(c(data$feature == "enodeb"))],
+                    features = data$feature,
                     #value = data$Gain[-which(c(data$feature == "enodeb"))])
-                    value = abs(data$Permutation[-which(c(data$feature == "enodeb"))]))
+                    value = abs(data$Permutation))
 
 name_mapping = c(
   " " = "O2", 
