@@ -12,19 +12,19 @@ plot_acf <- function(throughputs, type = c("acf", "pacf"),
   
   if (type == "acf") {
     chosen_func <- ggAcf
-    grid.text(title, gp=gpar(fontsize=15),
+    grid.text(title, gp=gpar(fontsize=20),
               vp = viewport(layout.pos.row = 1, layout.pos.col = 1:2))
     }
   else {
     chosen_func <- ggPacf
-    grid.text(title, gp=gpar(fontsize=15),
+    grid.text(title, gp=gpar(fontsize=20),
               vp = viewport(layout.pos.row = 1, layout.pos.col = 1:2))
     }
   
-  vodafone_plot <- chosen_func(throughputs$vodafone) + ggtitle("Vodafone") +
+  vodafone_plot <- chosen_func(throughputs$vodafone) + 
     ggtitle("Vodafone") + ylab("Korrelation") + theme_grey(base_size = 16)
   tmobile_plot <- chosen_func(throughputs$tmobile) + ggtitle("T-Mobile") + 
-    ggtitle("T-Mobile") + ylab("Korrelation") + theme_grey(base_size = 16)
+    ylab("Korrelation") + theme_grey(base_size = 16)
   o2_plot <- chosen_func(throughputs$o2) + ggtitle("O2") + ylab("Korrelation") + 
     theme_grey(base_size = 16)
   
