@@ -1,10 +1,11 @@
 \documentclass[10pt]{beamer}
 
-\usetheme[subsectionpage=progressbar]{metropolis}
+\usetheme[sectionpage=none, subsectionpage=progressbar]{metropolis}
 \usepackage{appendixnumberbeamer}
 
 \usepackage{ucs}
 \usepackage[utf8x]{inputenc}
+\usepackage[ngerman]{babel}
 
 \usepackage{booktabs}
 \usepackage[scale=2]{ccicons}
@@ -35,7 +36,9 @@
 
 %\input{abschnitte/einleitung}
 
-\input{abschnitte/TaskI}
+%\input{abschnitte/TaskI}
+
+\section{Task I - Vorhersage der Datenrate}
 
 \input{abschnitte/XGboost}
 
@@ -57,6 +60,8 @@
 
 \begin{frame}[allowframebreaks]{Literatur}
 
+  \nocite{XGBoost}
+
   \bibliography{literatur}
   \bibliographystyle{abbrv}
 
@@ -76,5 +81,7 @@
 		\widehat{y_{t+2}} &= c + \beta_1 x_{t} + \widehat{\epsilon_{t+2}}\text{ mit }&&\widehat{\epsilon_{t+2}} = \phi_1\widehat{\epsilon_{t+1}} + \phi_2\epsilon_t + \theta \underbrace{\widehat{e_{t+1}}}_{=0} + \theta e_t + \underbrace{\widehat{e_{t+2}}}_{=0}
 	\end{alignat*}
 \end{frame}
+
+\input{abschnitte/xgboost_outtakes}
 
 \end{document}
