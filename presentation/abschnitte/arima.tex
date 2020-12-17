@@ -1,56 +1,16 @@
 \subsection{Regression mit ARMA-Fehlern}
-\nocite{forecasting}
-
-\begin{frame}{Situation}
-	\begin{figure}[]
-		%\centering
-		\includegraphics[scale=0.25]{highway_drive_one}
-		\caption{Grafik der auf der ersten Testfahrt im Szenario ``Highway'' gemessenen Datenübertragungsrate.}
-		\label{highway_drive_one}
-	\end{figure}
-	
-	\begin{itemize}
-		\item Zeitreihe $y_1,...,y_n$ (Zielvariable)
-		\item k Zeitreihen $x_{i,1},...,x_{i,n}$ für $i=1,...,k$ (Einflussvariablen)
-	\end{itemize}
-\end{frame}
-
 \begin{frame}{Regression mit ARMA-Fehlern}
-	\textbf{Lineares Regressionsmodell} \\
-	$$y_{t} = c + \beta_1 x_{1,t} + ... + \beta_k x_{k,t} + \epsilon_t \text{ mit Fehler } \epsilon_t \text{ und Konstante }c$$ \\
-	Annahmen an Fehler:
+	\underline{Gegeben}: 
 	\begin{itemize}
-		\item $E((\epsilon_1,...,\epsilon_n)^T) = 0$
-		\item $Cov((\epsilon_1,...,\epsilon_n)^T)=\sigma^2 \mathds{1}_n$
+		\item Beobachtungen $(y_1,...,y_T)$ der Zeitreihe $(y_t)_t$
+		\item Beobachtungen $(x_1^{(i)},...,x_T^{(i)})$ der Zeitreihen $(x_t^{(i)})_t$ für $i=1,...,k$
 	\end{itemize}
-	\textbf{Annahmen sind in unserer Situation nicht einhaltbar!}
-\end{frame}
+	\textbf{Modellgleichung: Regression mit ARMA(p, q)-Fehlern}\\
+	\begin{align*}
+		y_t &= c + \sum_{j=1}^{k}\beta_j x_t^{(j)} + \eta_t \text{ mit} \\
+		\eta_t &= \underbrace{\sum_{k=1}^{p}\phi_p\eta_{t-p}}_{\text{vergangene Fehler: LM}} + \underbrace{\sum_{l=1}^{q}\theta_l\epsilon_{t-q}}_{\text{vergangene Fehler: ARMA}} + \epsilon_{t}
+	\end{align*}
 
-\begin{frame}{Regression mit ARMA-Fehlern}
-	\textbf{ARMA(p, q)}: Zusammengesetzes Modell aus\\
-	\begin{itemize}
-		\item $AR(p)$ (Auto Regressive): Linearkombination aus
-		\begin{itemize}
-			\item p vorherige Beobachtungen, 
-			\item Konstante
-			\item Fehler
-		\end{itemize}
-		\item $MA(q)$ (Moving Average): Linearkombination aus
-		\begin{itemize}
-			\item q vorherige Fehler
-			\item Konstante
-			\item aktueller Fehler
-		\end{itemize}
-	\end{itemize}
-\end{frame}
-
-\begin{frame}{Regression mit ARMA-Fehlern}
-	\textbf{Anwendung auf Regressionsfehler} \\
-	\underline{Erinnerung}: Fehler $(\epsilon_1,...,\epsilon_n)$ des linearen Modells sind autokorreliert $\Rightarrow$ erfüllen Voraussetzungen nicht\\
-	\underline{Lösung}: Wende ARMA-Modell auf Fehler an \\
-	\textbf{Modellgleichung Regression mit ARMA-Fehlern}:
-	$$y_t = c + \sum_{i=1}^{k}{\beta_i x_{i,t}} + \underbrace{\sum_{j=1}^{p}{\phi_j\epsilon_{t-j}}}_{\text{vergangene Fehler LM}} + \underbrace{\sum_{k=1}^{q}{\theta_k e_{t-k}}}_{\text{vergangene Fehler ARMA}} + e_t$$
-	
 \end{frame}
 
 
