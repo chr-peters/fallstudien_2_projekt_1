@@ -1,4 +1,8 @@
 
+library(ggplot2)
+library(tidytext)
+
+
 #--------------------KENNZAHLEN VERGLEICH XGBOOST/ARIMA TASK I----------------------------------------#
 setwd("~/GitHub/fallstudien_2_projekt_1/prediction_results")
 
