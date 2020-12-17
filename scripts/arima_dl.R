@@ -491,28 +491,74 @@ setwd("~/GitHub/fallstudien_2_projekt_1/predicition_results")
 dldata <- read.csv("feature_importance_xgboost_dl.csv", header = TRUE)
 
 
-df_dl <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
-                    #features = uldata$feature[-which(c(data$feature == "enodeb"))],
-                    features = dldata$feature,
-                    #value = uldata$Gain[-which(c(data$feature == "enodeb"))])
-                    value = abs(dldata$Permutation))
+# df_dl <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
+#                     #features = uldata$feature[-which(c(data$feature == "enodeb"))],
+#                     features = dldata$feature,
+#                     #value = uldata$Gain[-which(c(data$feature == "enodeb"))])
+#                     value = abs(dldata$Permutation))
+# 
+# 
+# df1 <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
+#                   features = rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
+#                   value = abs(c(coeff$o2[-which(names(coeff$o2) == "intercept")], 
+#                                 coeff$tmobile[-which(names(coeff$tmobile) == "intercept")],
+#                                 coeff$vodafon[-which(names(coeff$vodafone) == "intercept")])))
+# 
+# name_mapping = c(
+#   " " = "O2", 
+#   "  " = "T-Mobile", 
+#   "   " = "Vodafone"
+# )
+# 
+# ggplot(data = df_dl, aes(x = reorder_within(features, -value, provider, sep = " "), y = value, fill = provider)) +
+#   geom_bar(stat = "identity" ) + 
+#   facet_wrap(~ provider, scales = "free", labeller = as_labeller(name_mapping)) +
+#   theme_grey(base_size = 18) +
+#   theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
+#         legend.position = "none") +
+#   ggtitle("Feature Importance der verschiedenen Provider - Downlink") + 
+#   xlab("Features") + 
+#   ylab("Koeffizienten")
+
+# Vergleich der Modelle 
+
+for (provider in c("o2", "tmobile", "vodafone")){
+  
+  dldata[dldata$provider == provider,]$Permutation <- abs(dldata[dldata$provider == provider,]$Permutation)/
+    sum(abs(dldata[dldata$provider == provider,]$Permutation))
+  
+}
+
+coeff$o2[-which(names(coeff$o2) == "intercept")] <- abs(coeff$o2[-which(names(coeff$o2) == "intercept")])/
+  sum(abs(coeff$o2[-which(names(coeff$o2) == "intercept")]))
+
+coeff$tmobile[-which(names(coeff$tmobile) == "intercept")] <- abs(coeff$tmobile[-which(names(coeff$tmobile) == "intercept")])/
+  sum(abs(coeff$tmobile[-which(names(coeff$tmobile) == "intercept")]))
 
 
-df1 <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
-                  features = rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
-                  value = abs(c(coeff$o2[-which(names(coeff$o2) == "intercept")], 
-                                coeff$tmobile[-which(names(coeff$tmobile) == "intercept")],
-                                coeff$vodafon[-which(names(coeff$vodafone) == "intercept")])))
+coeff$vodafone[-which(names(coeff$vodafone) == "intercept")] <- abs(coeff$vodafone[-which(names(coeff$vodafone) == "intercept")])/
+  sum(abs(coeff$vodafone[-which(names(coeff$vodafone) == "intercept")]))
 
-name_mapping = c(
-  " " = "O2", 
-  "  " = "T-Mobile", 
-  "   " = "Vodafone"
+
+
+df_dl_both <- data.frame(provider = c(rep(c("O2", "T-Mobile", "Vodafone"), each = 9),rep(c("O2", "T-Mobile", "Vodafone"), each = 9)),
+                         features = c(rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
+                                      uldata$feature),
+                         value = abs(c(coeff$o2[-which(names(coeff$o2) == "intercept")], 
+                                       coeff$tmobile[-which(names(coeff$tmobile) == "intercept")],
+                                       coeff$vodafon[-which(names(coeff$vodafone) == "intercept")],
+                                       uldata$Permutation)),
+                         model = c(rep("ARIMA", 27), rep("XGBoost", 27)))
+
+
+name_mapping = list(
+  "vodafone" = "Vodafone", 
+  "tmobile" = "T-Mobile", 
+  "o2" = "O2"
 )
-
-ggplot(data = df_dl, aes(x = reorder_within(features, -value, provider, sep = " "), y = value, fill = provider)) +
+ggplot(data = df_dl_both, aes(x = features, y = value, fill = provider)) +
   geom_bar(stat = "identity" ) + 
-  facet_wrap(~ provider, scales = "free", labeller = as_labeller(name_mapping)) +
+  facet_grid(model ~ provider, labeller = as_labeller(name_mapping)) +
   theme_grey(base_size = 18) +
   theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
         legend.position = "none") +

@@ -461,41 +461,86 @@ ggplot(data = df, aes(x = kennzahl, y = value, fill = provider)) +
   xlab("Kennzahlen") + 
   ylab("Wert")
 
-#--------------------FEATURE IMPORTANCE----------------------------------------#
+#--------------------FEATURE IMPORTANCE VERGLEICH----------------------------------------#
 
 
 setwd("~/GitHub/fallstudien_2_projekt_1/predicition_results")
 uldata <- read.csv("feature_importance_xgboost_ul.csv", header = TRUE)
 
+# Feature Importance XGBoost
+# df_ul_xg <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
+#                     #features = uldata$feature[-which(c(data$feature == "enodeb"))],
+#                     features = uldata$feature,
+#                     #value = uldata$Gain[-which(c(data$feature == "enodeb"))])
+#                     value = abs(uldata$Permutation))
 
-df_ul <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
-                    #features = uldata$feature[-which(c(data$feature == "enodeb"))],
-                    features = uldata$feature,
-                    #value = uldata$Gain[-which(c(data$feature == "enodeb"))])
-                    value = abs(uldata$Permutation))
+#Feature Importance ARIMA
+# df_ul_ar <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
+#                   features = rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
+#                   value = abs(c(coeff$o2[-which(names(coeff$o2) == "intercept")], 
+#                                 coeff$tmobile[-which(names(coeff$tmobile) == "intercept")],
+#                                 coeff$vodafon[-which(names(coeff$vodafone) == "intercept")])))
 
 
-df1 <- data.frame(provider = rep(c(" ", "  ", "   "), each = 9),
-                  features = rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
+# ggplot(data = df_ul, aes(x = model, y = value, fill = kennzahl))+
+#   geom_bar(stat = "identity", position = position_dodge()) + 
+#   facet_grid(kennzahl ~ provider, scales = "free_y") +
+#   theme_grey(base_size = 18) +
+#   theme(legend.title = element_blank(), 
+#         legend.position = "none") +
+#   ggtitle("Vergleich der Kennzahlen der verschiedenen Modelle - Uplink") + 
+#   xlab("Modelle") + 
+#   ylab("Wert")
+
+# Normieren
+# xgboost
+
+for (provider in c("o2", "tmobile", "vodafone")){
+  
+  uldata[uldata$provider == provider,]$Permutation <- abs(uldata[uldata$provider == provider,]$Permutation)/
+    sum(abs(uldata[uldata$provider == provider,]$Permutation))
+  
+}
+
+coeff$o2[-which(names(coeff$o2) == "intercept")] <- abs(coeff$o2[-which(names(coeff$o2) == "intercept")])/
+  sum(abs(coeff$o2[-which(names(coeff$o2) == "intercept")]))
+
+coeff$tmobile[-which(names(coeff$tmobile) == "intercept")] <- abs(coeff$tmobile[-which(names(coeff$tmobile) == "intercept")])/
+  sum(abs(coeff$tmobile[-which(names(coeff$tmobile) == "intercept")]))
+ 
+
+coeff$vodafone[-which(names(coeff$vodafone) == "intercept")] <- abs(coeff$vodafone[-which(names(coeff$vodafone) == "intercept")])/
+  sum(abs(coeff$vodafone[-which(names(coeff$vodafone) == "intercept")]))
+
+
+
+df_ul_both <- data.frame(provider = c(rep(c("O2", "T-Mobile", "Vodafone"), each = 9),rep(c("O2", "T-Mobile", "Vodafone"), each = 9)),
+                  features = c(rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
+                               uldata$feature),
                   value = abs(c(coeff$o2[-which(names(coeff$o2) == "intercept")], 
                                 coeff$tmobile[-which(names(coeff$tmobile) == "intercept")],
-                                coeff$vodafon[-which(names(coeff$vodafone) == "intercept")])))
+                                coeff$vodafon[-which(names(coeff$vodafone) == "intercept")],
+                            uldata$Permutation)),
+                  model = c(rep("ARIMA", 27), rep("XGBoost", 27)))
 
-name_mapping = c(
-  " " = "O2", 
-  " " = "T-Mobile", 
-  " " = "Vodafone"
+
+name_mapping = list(
+  "o2" = "O2",
+  "tmobile" = "T-Mobile", 
+  "vodafone" = "Vodafone"
 )
-
-ggplot(data = df_ul, aes(x = reorder_within(features, -value, provider, sep = " "), y = value, fill = provider)) +
+ggplot(data = df_ul_both, aes(x = features, y = value, fill = provider)) +
   geom_bar(stat = "identity" ) + 
-  facet_wrap(~ provider, scales = "free", labeller = as_labeller(name_mapping)) +
+  facet_grid(model ~ provider,  labeller = as_labeller(name_mapping)) +
   theme_grey(base_size = 18) +
   theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
         legend.position = "none") +
   ggtitle("Feature Importance der verschiedenen Provider - Uplink") + 
   xlab("Features") + 
   ylab("Koeffizienten")
+
+
+
 
 #------------------------------------------------------------------------------#
 

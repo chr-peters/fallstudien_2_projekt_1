@@ -47,7 +47,7 @@ for (provider in c("vodafone", "tmobile", "o2")){
 
 ## UL
 
-df_ul <- data.frame(model = rep(c("XGBoost", "LM+Arima"), each = 6),
+df_ul <- data.frame(model = rep(c("XGBoost", "ARIMA"), each = 6),
                  provider = rep(c("Vodafone", "T-Mobile", "O2"), 4),
                  kennzahl = c(rep(c("MAE", "R²"), each = 3),rep(c("MAE", "R²"), each = 3)),
                  value = c(kennzahlen_ul_xgboost$vodafone$mae,
@@ -103,7 +103,7 @@ ggplot(data = df_dl, aes(x = model, y = value, fill = model) )+
 
 
 
-#--------------------FEATURE IMPORTANCE VERGLEICH XGBOOST/ARIMA----------------------------------------#
+#--------------------FEATURE IMPORTANCE XGBOOST LINK LIFETIME----------------------------------------#
 
 setwd("~/GitHub/fallstudien_2_projekt_1/prediction_results")
 
@@ -111,10 +111,10 @@ data <- read.csv("feature_importance_xgboost_linklifetime.csv", header = TRUE)
 
 
 df_ll <- data.frame(provider = rep(c(" ", "  ", "   "), each = 8),
-                    features = data$feature[-which(c(data$feature == "enodeb"))],
                     #features = data$feature[-which(c(data$feature == "enodeb"))],
-                    value = data$Gain[-which(c(data$feature == "enodeb"))])
-                    #value = abs(data$Permutation[-which(c(data$feature == "enodeb"))]))
+                    features = data$feature[-which(c(data$feature == "enodeb"))],
+                    #value = data$Gain[-which(c(data$feature == "enodeb"))])
+                    value = abs(data$Permutation[-which(c(data$feature == "enodeb"))]))
 
 name_mapping = c(
   " " = "O2", 
