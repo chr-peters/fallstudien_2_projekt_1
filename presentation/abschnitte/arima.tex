@@ -26,53 +26,20 @@
 	\end{itemize}
 \end{frame}
 
-\begin{frame}{Regression mit ARMA-Fehlern}
-	\textbf{Bestimmung des Grids für die AR-Ordnung - Uplink}
-	\noindent\begin{minipage}{0.6\textwidth}%
+\begin{frame}{Bestimmung des Grids für die AR-Ordnung - Uplink}
 		\begin{figure}
 			%\centering
-			\includegraphics[scale=0.35]{plots/arima/uplink/res_pacf}\\
-			\caption{Partielle Autokorrelationsfunktion der Residuen des linearen Modells in Richtung Uplink.}
+			\includegraphics[scale=0.42]{plots/arima/uplink/res_pacf}\\
 			\label{res_pacf_ul}
 		\end{figure}
-	\end{minipage}%
-	\hfill%
-	\begin{minipage}{0.4\textwidth}\raggedleft
-		\vspace{1.3cm}
-		\textbf{gewählte Grids:}\\
-		Vodafone: 0 - 2 \\
-		T-Mobile: 0 - 3 \\
-		O2: 0 - 3 \\
-	\end{minipage}
 \end{frame}
 
-\begin{frame}{Regression mit ARMA-Fehlern}
-	\textbf{Bestimmung des Grids für die MA-Ordnung - Uplink}
-	\noindent\begin{minipage}{0.6\textwidth}%
+\begin{frame}{Bestimmung des Grids für die MA-Ordnung - Uplink}
 		\begin{figure}
 			%\centering
-			\includegraphics[scale=0.35]{plots/arima/uplink/res_acf}\\
-			\caption{Autokorrelationsfunktion der Residuen des linearen Modells in Richtung Uplink.}
+			\includegraphics[scale=0.42]{plots/arima/uplink/res_acf}\\
 			\label{res_acf_ul}
 		\end{figure}
-	\end{minipage}%
-	\hfill%
-	\begin{minipage}{0.4\textwidth}\raggedleft
-		\vspace{1.3cm}
-		\textbf{gewählte Grids:}\\
-		Vodafone: 0 - 4 \\
-		T-Mobile: 0 - 4 \\
-		O2: 0 - 5 \\
-	\end{minipage}
-\end{frame}
-
-\begin{frame}{Regression mit ARMA-Fehlern: Ergebnisse (Uplink)}
-	\begin{figure}
-		\centering
-		\includegraphics[scale=0.38]{plots/arima/uplink/vodafone_predictions}\\
-		\caption{Vorhersage der Datenübertragungsrate des Providers Vodafone in Richtung Uplink.}
-		\label{vodafone_predictions_ul}
-	\end{figure}
 \end{frame}
 
 \begin{frame}{Regression mit ARMA-Fehlern: Ergebnisse (Uplink)}
@@ -87,45 +54,9 @@
 \begin{frame}{Regression mit ARMA-Fehlern: Ergebnisse (Uplink)}
 	\begin{figure}
 		\centering
-		\includegraphics[scale=0.38]{plots/arima/uplink/o2_predictions}\\
-		\caption{Vorhersage der Datenübertragungsrate des Providers O2 in Richtung Uplink.}
-		\label{o2_predictions_ul}
-	\end{figure}
-\end{frame}
-
-\begin{frame}{Regression mit ARMA-Fehlern: Ergebnisse (Uplink)}
-	\begin{figure}
-		\centering
 		\includegraphics[scale=0.38]{plots/arima/uplink/scatter_colored_axes_fixed}\\
 		\caption{Scatterplots der Vorhersagen und Beobachtungen für alle Szenarien und alle Provider in Richtung Uplink.}
 		\label{arima_scatter_ul}
-	\end{figure}
-\end{frame}
-
-\begin{frame}{Regression mit ARMA-Fehlern: Ergebnisse (Downlink)}
-	\begin{figure}
-		\centering
-		\includegraphics[scale=0.38]{plots/arima/downlink/vodafone_predictions}\\
-		\caption{Vorhersage der Datenübertragungsrate des Providers Vodafone in Richtung Downlink.}
-		\label{vodafone_predictions_dl}
-	\end{figure}
-\end{frame}
-
-\begin{frame}{Regression mit ARMA-Fehlern: Ergebnisse (Downlink)}
-	\begin{figure}
-		\centering
-		\includegraphics[scale=0.38]{plots/arima/downlink/tmobile_predictions}\\
-		\caption{Vorhersage der Datenübertragungsrate des Providers T-Mobile in Richtung Downlink.}
-		\label{tmobile_predictions_dl}
-	\end{figure}
-\end{frame}
-
-\begin{frame}{Regression mit ARMA-Fehlern: Ergebnisse (Downlink)}
-	\begin{figure}
-		\centering
-		\includegraphics[scale=0.38]{plots/arima/downlink/o2_predictions}\\
-		\caption{Vorhersage der Datenübertragungsrate des Providers O2 in Richtung Downlink.}
-		\label{o2_predictions_dl}
 	\end{figure}
 \end{frame}
 

@@ -1,21 +1,21 @@
 \section{Task II - Handover Vorhersage und Link Lifetime}
 
+\subsection{L\"osungsansatz}
+
 
 \begin{frame}{Datentransformation}
-$\textbf{Idee}$: Prädiktionsmodell XGBoost für Link Lifetime mit Einfluss des \\
- \hspace{9mm} RSRP/RSRQ der verbundenen sowie der Nachbarzellen \\
+\textbf{Idee:}
 
-\quad\\
+Prädiktionsmodell XGBoost für Link Lifetime mit Einfluss des RSRP/RSRQ der verbundenen sowie der Nachbarzellen
 
-$\rightarrow$ Datentransformation\\
-
-\quad\\
+$\rightarrow$ Datentransformation
 
 	\begin{itemize}
-		\item RSRP/RSRQ Nachbarzellen : \\
-		$\rightarrow$ mehrere Messungen - Filtern des besten Wertes zum aktuellen \\
-		\hspace{4mm} Zeitpunkt \\
-		$\rightarrow$ keine Messungen - Übernehmen des letzten Wertes \\
+		\item RSRP/RSRQ Nachbarzellen :
+		\begin{itemize}
+		    \item[$\rightarrow$] mehrere Messungen - Filtern des besten Wertes zum aktuellen Zeitpunkt
+		    \item[$\rightarrow$] keine Messungen - Übernehmen des letzten Wertes
+		\end{itemize}
 		\item eNodeB Wechsel $\rightarrow$ Response Variable Link Lifetime
 	\end{itemize} 
 \end{frame}
@@ -55,24 +55,9 @@ Wichtige Schritte :
 $\rightarrow$ $\textbf{Analog zu Task I}$
 \end{frame}
 
-
-
-
-
-\begin{frame}{Ergebnisse - Zeitreihenplot O2}
-\includegraphics[width = 11cm]{plots/link_lifetime/o2_predictions}
-\end{frame}
-
-
 \begin{frame}{Ergebnisse - Zeitreihenplot T-Mobile}
 \includegraphics[width = 11cm]{plots/link_lifetime/tmobile_predictions}
 \end{frame}
-
-
-\begin{frame}{Ergebnisse - Zeitreihenplot Vodafone}
-\includegraphics[width = 11cm]{plots/link_lifetime/vodafone_predictions}
-\end{frame}
-
 
 \begin{frame}{Ergebnisse - Scatterplot}
 \includegraphics[width = 11cm]{plots/link_lifetime/scatter_colored_axes_fixed}
@@ -82,4 +67,3 @@ $\rightarrow$ $\textbf{Analog zu Task I}$
 \begin{frame}{Ergebnisse - Kennzahlen}
 \includegraphics[width = 11cm]{plots/link_lifetime/kennzahlen_linklifetime}
 \end{frame}
-
