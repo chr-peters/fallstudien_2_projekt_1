@@ -1,10 +1,11 @@
 \documentclass[10pt]{beamer}
 
-\usetheme[subsectionpage=progressbar]{metropolis}
+\usetheme[sectionpage=none, subsectionpage=progressbar]{metropolis}
 \usepackage{appendixnumberbeamer}
 
 \usepackage{ucs}
 \usepackage[utf8x]{inputenc}
+\usepackage[ngerman]{babel}
 
 \usepackage{booktabs}
 \usepackage[scale=2]{ccicons}
@@ -35,7 +36,9 @@
 
 %\input{abschnitte/einleitung}
 
-\input{abschnitte/TaskI}
+%\input{abschnitte/TaskI}
+
+\section{Task I - Vorhersage der Datenrate}
 
 \input{abschnitte/XGboost}
 
@@ -57,24 +60,14 @@
 
 \begin{frame}[allowframebreaks]{Literatur}
 
+  \nocite{XGBoost}
+
   \bibliography{literatur}
   \bibliographystyle{abbrv}
 
 \end{frame}
 
-\begin{frame}{Regression mit ARMA-Fehlern}
-	\textbf{h-Schritt Punktvorhersage}\\
-	\begin{itemize}
-		\item Ersetze Beobachtungen zu zukünftigen Zeitpunkten mit deren Vorhersagen
-		\item Ersetze Fehler an vergangenen Zeitpunkten durch das entsprechende Residuum
-		\item Ersetze Fehler an zukünftigen Zeitpunkten durch 0
-	\end{itemize}
-	\underline{Beispiel}: $h=2, k=1, p=2, q=2$
-	\begin{alignat*}{2}
-		y_t &= c + \beta_1 x_{t} + \epsilon_t \text{ mit }&&\epsilon_{t} = \phi_1\epsilon_{t-1} + \phi_2\epsilon_{t-2} + \theta_1e_{t-1} + \theta_2e_{t-2} + e_t \\		
-		\widehat{y_{t+1}} &= c + \beta_1 x_{t} + \widehat{\epsilon_{t+1}} \text{ mit }&& \widehat{\epsilon_{t+1}} = \phi_1\epsilon_{t} + \phi_2\epsilon_{t-1} + \theta_1e_{t} + \theta_2e_{t-1} + \underbrace{\widehat{e_{t+1}}}_{=0}\\
-		\widehat{y_{t+2}} &= c + \beta_1 x_{t} + \widehat{\epsilon_{t+2}}\text{ mit }&&\widehat{\epsilon_{t+2}} = \phi_1\widehat{\epsilon_{t+1}} + \phi_2\epsilon_t + \theta \underbrace{\widehat{e_{t+1}}}_{=0} + \theta e_t + \underbrace{\widehat{e_{t+2}}}_{=0}
-	\end{alignat*}
-\end{frame}
+\input{abschnitte/xgboost_outtakes}
+%\input{abschnitte/arima_end}
 
 \end{document}

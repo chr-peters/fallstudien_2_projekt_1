@@ -47,7 +47,7 @@ for (direction in c("uplink", "downlink")){
     if (direction == "uplink") data = data_ul
     else data = data_dl
     plot_predictions(
-      data = data_ul, 
+      data = data, 
       direction = direction, 
       provider = provider, 
       model = "xgboost", 
@@ -59,18 +59,18 @@ for (direction in c("uplink", "downlink")){
 for (direction in c("uplink", "downlink")){
   if (direction == "uplink") data = data_ul
   else data = data_dl
-  plot_scatter(
-    data = data, 
-    direction = direction, 
-    model = "xgboost", 
-    drive_id_colored = FALSE, 
-    filename = "scatter.png")
+  # plot_scatter(
+  #   data = data, 
+  #   direction = direction, 
+  #   model = "xgboost", 
+  #   drive_id_colored = FALSE, 
+  #   filename = "scatter.png")
   plot_scatter(
     data = data, 
     direction = direction, 
     model = "xgboost", 
     drive_id_colored = TRUE, 
-    filename = "scatter_colored.png")
+    filename = "scatter_colored_axes_fixed.png")
 }
 
 
@@ -82,10 +82,10 @@ for (provider in c("vodafone", "tmobile", "o2")){
 }  
 
 #--------------------------LINK LIFETIME SCATTER-------------------------ä
-plot_linklifetime_scatter(data = linklifetime, 
-                          drive_id_colored = FALSE, 
-                          filename = "scatter.png")
+# plot_linklifetime_scatter(data = linklifetime, 
+#                           drive_id_colored = FALSE, 
+#                           filename = "scatter.png")
 plot_linklifetime_scatter(data = linklifetime, 
                           drive_id_colored = TRUE, 
-                          filename = "scatter_colored.png")
+                          filename = "scatter_colored_axes_fixed.png")
 
