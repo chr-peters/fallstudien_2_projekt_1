@@ -542,13 +542,14 @@ coeff$vodafone[-which(names(coeff$vodafone) == "intercept")] <- abs(coeff$vodafo
 
 
 df_dl_both <- data.frame(provider = c(rep(c("O2", "T-Mobile", "Vodafone"), each = 9),rep(c("O2", "T-Mobile", "Vodafone"), each = 9)),
-                         features = c(rep(lm_features[-which(lm_features == "throughput_mbits")], 3),
+                         features = c(dldata$feature,
                                       dldata$feature),
-                         value = abs(c(coeff$o2[-which(names(coeff$o2) == "intercept")], 
-                                       coeff$tmobile[-which(names(coeff$tmobile) == "intercept")],
-                                       coeff$vodafon[-which(names(coeff$vodafone) == "intercept")],
+                         value = abs(c(dldata$Gain,
+                                      #c(coeff$o2[-which(names(coeff$o2) == "intercept")], 
+                                       #coeff$tmobile[-which(names(coeff$tmobile) == "intercept")],
+                                       #coeff$vodafon[-which(names(coeff$vodafone) == "intercept")],
                                        dldata$Permutation)),
-                         model = c(rep("ARIMA", 27), rep("XGBoost", 27)))
+                         model = c(rep("Gain", 27), rep("Permutation", 27)))
 
 
 name_mapping = list(
@@ -558,10 +559,10 @@ name_mapping = list(
 )
 ggplot(data = df_dl_both, aes(x = features, y = value, fill = provider)) +
   geom_bar(stat = "identity" ) + 
-  facet_grid(model ~ provider, labeller = as_labeller(name_mapping)) +
+  facet_grid(model ~ provider, scales = "free", labeller = as_labeller(name_mapping)) +
   theme_grey(base_size = 18) +
   theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
         legend.position = "none") +
-  ggtitle("Feature Importance Modellvergleich - Downlink") + 
+  ggtitle("Vergleich Methoden XGBoost  - Downlink") + 
   xlab("Features") + 
   ylab("Wichtigkeit")
