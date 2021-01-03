@@ -107,30 +107,105 @@ VIF(lm_o2)
 
 ## Überprüfen der Normalverteilungsannahme der Residuen
 
-res_vodafone <- data.frame(res = rstandard(lm_vodafone), provider = "Vodafone")
-res_tmobile <- data.frame(res = rstandard(lm_tmobile), provider = "T-Mobile")
-res_o2 <- data.frame(res = rstandard(lm_o2), provider = "O2")
+res_tmobile <- data.frame(res = rstandard(lm_tmobile), 
+                          provider = "T-Mobile", 
+                          id = 1:length(rstandard(lm_tmobile)))
+res_vodafone <- data.frame(res = rstandard(lm_vodafone), 
+                           provider = "Vodafone", 
+                           id = 1:length(rstandard(lm_vodafone)))
+res_o2 <- data.frame(res = rstandard(lm_o2), 
+                     provider = "O2", 
+                     id = 1:length(rstandard(lm_o2)))
 
 res_data <- rbind(res_vodafone, res_tmobile, res_o2)
 
-## Scatterplot
 
-ggplot(res_data, aes(x = 1:nrow(res_data), y = res)) + geom_point() + 
-  facet_wrap(~provider, scales = "free_x")
+# Scatterplot 
+ggplot(res_data, aes(x = id, y = res, color = provider)) + geom_point() + 
+  geom_abline(slope = 0, color = "black", size = 1, alpha = 0.8) +
+  facet_wrap(~provider, scales = "free_x") + 
+  ggtitle("Scatterplot der Residuen - Downlink") + 
+  xlab("") + ylab("Residuen") +
+  theme_grey(base_size = 20) + 
+  theme(legend.position = "none")
+
+ggsave(filename="res_scatter.png", 
+       plot=last_plot(),
+       path = paste(
+         "C:/Users/", 
+         Sys.getenv("USERNAME"), 
+         "/Documents/GitHub/fallstudien_2_projekt_1/presentation/plots/arima/downlink",
+         sep = ""),
+       width = 30, height = 20, 
+       units = "cm",
+       dpi = 200
+)
 
 # qq-Plots
 
-ggplot(res_data, aes(sample=res)) + geom_qq() + 
-  geom_abline(intercept = 0, slope = 1, color = "red", size = 1, alpha = 0.8) + 
-  facet_wrap(~provider) + ggtitle("QQ-Plots Normalverteilung - Downlink") + 
-  xlab("theoretische Quantile") + ylab("Quantile der Residuen")
+ggplot(res_data, aes(sample=res, color = provider)) + 
+  geom_qq() + 
+  geom_abline(intercept = 0, slope = 1, color = "black", size = 1, alpha = 0.8) + 
+  facet_wrap(~provider) + 
+  ggtitle("QQ-Plots Normalverteilung - Downlink") + 
+  xlab("theoretische Quantile") + 
+  ylab("Quantile der Residuen" ) +
+  theme_grey(base_size = 20) + 
+  theme(legend.position = "none")
 
+ggsave(filename="res_qq.png", 
+       plot=last_plot(),
+       path = paste(
+         "C:/Users/", 
+         Sys.getenv("USERNAME"), 
+         "/Documents/GitHub/fallstudien_2_projekt_1/presentation/plots/arima/downlink",
+         sep = ""),
+       width = 30, height = 20, 
+       units = "cm",
+       dpi = 200
+)
 
 # Histogramme
 
-ggplot(res_data, aes(x = res)) + geom_histogram(color="black", fill="pink") + 
-  facet_wrap(~ provider) + ggtitle("Histogramme der Residuen - Downlink") + 
-  xlab("Residuen") + ylab("Anzahl")
+ggplot(res_data, aes(x = res, color = provider, fill = provider)) + 
+  geom_histogram() + 
+  facet_wrap(~ provider) + 
+  ggtitle("Histogramme der Residuen - Downlink") + 
+  xlab("Residuen") + ylab("Anzahl") +
+  theme_grey(base_size = 20) + 
+  theme(legend.position = "none")
+
+ggsave(filename="res_histogram.png", 
+       plot=last_plot(),
+       path = paste(
+         "C:/Users/", 
+         Sys.getenv("USERNAME"), 
+         "/Documents/GitHub/fallstudien_2_projekt_1/presentation/plots/arima/downlink",
+         sep = ""),
+       width = 30, height = 20, 
+       units = "cm",
+       dpi = 200
+)
+
+
+## Scatterplot
+
+# ggplot(res_data, aes(x = 1:nrow(res_data), y = res)) + geom_point() + 
+#   facet_wrap(~provider, scales = "free_x")
+# 
+# # qq-Plots
+# 
+# ggplot(res_data, aes(sample=res)) + geom_qq() + 
+#   geom_abline(intercept = 0, slope = 1, color = "red", size = 1, alpha = 0.8) + 
+#   facet_wrap(~provider) + ggtitle("QQ-Plots Normalverteilung - Downlink") + 
+#   xlab("theoretische Quantile") + ylab("Quantile der Residuen")
+# 
+# 
+# # Histogramme
+# 
+# ggplot(res_data, aes(x = res)) + geom_histogram(color="black", fill="pink") + 
+#   facet_wrap(~ provider) + ggtitle("Histogramme der Residuen - Downlink") + 
+#   xlab("Residuen") + ylab("Anzahl")
 
 
 # Ergebnisse: o2, tmobile sehen gut aus, Vodafone hat viele Ausreißer
