@@ -1,4 +1,5 @@
 library(ggplot2)
+library(anytime)
 
 plot_predictions <- function(data, 
                          direction = c("downlink", "uplink"), 
@@ -56,7 +57,7 @@ plot_predictions <- function(data,
   if(ci == TRUE){
     plot = plot + 
       geom_ribbon(aes(ymin = lower, ymax = upper), colour = NA, alpha = 0.2) +
-      scale_color_hue(labels = c("Beobachtung", "Vorhersage mit 80% KI"))
+      scale_color_hue(labels = c("Beobachtung", "Vorhersage mit 80% Prognoseintervall"))
   }
   else plot = plot + 
     scale_color_hue(labels = c("Beobachtung", "Vorhersage"))
