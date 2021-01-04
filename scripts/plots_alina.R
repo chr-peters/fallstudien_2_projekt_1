@@ -170,11 +170,13 @@ ggplot(data = df_ll, aes(x = reorder_within(features, -value, provider, sep = " 
   geom_bar(stat = "identity" ) + 
   facet_wrap(~ provider, scales = "free", labeller = as_labeller(name_mapping)) +
   theme_grey(base_size = 18) +
-  theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
-        legend.position = "none") +
+  theme(legend.title = element_blank(), axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5, size = 14),
+        legend.position = "none", axis.title.x = element_text(size = 30), axis.title.y = element_text(size = 30),
+        plot.title = element_text(size = 30)) +
   ggtitle("Feature Importance der verschiedenen Provider - Link-Lifetime") + 
   xlab("Features") + 
-  ylab("Koeffizienten")
+  ylab("Wichtigkeit")
+
 
 
 
