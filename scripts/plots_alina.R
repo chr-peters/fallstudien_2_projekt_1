@@ -74,7 +74,8 @@ ggplot(data = df_ul, aes(x = model, y = value, fill = model) )+
   theme_grey(base_size = 18) +
   theme(legend.title = element_blank(), 
         legend.position = "none") +
-  ggtitle("Vergleich der Kennzahlen der verschiedenen Modelle - Uplink") + 
+  ggtitle("Vergleich der Kennzahlen der verschiedenen Modelle - Uplink") +
+  geom_text(aes(label=formatC(round(value, digits = 2), format='f', digits=2)), size = 5, position=position_dodge(width=0.9), vjust=1.5) +
   xlab("Modelle") + 
   ylab("Wert")
 
@@ -102,7 +103,8 @@ ggplot(data = df_dl, aes(x = model, y = value, fill = model) )+
   theme_grey(base_size = 18) +
   theme(legend.title = element_blank(), 
         legend.position = "none") +
-  ggtitle("Vergleich der Kennzahlen der verschiedenen Modelle - Downlink") + 
+  ggtitle("Vergleich der Kennzahlen der verschiedenen Modelle - Downlink") +
+  geom_text(aes(label=formatC(round(value, digits = 2), format='f', digits=2)), size = 5, position=position_dodge(width=0.9), vjust=1.5) +
   xlab("Modelle") + 
   ylab("Wert")
 
