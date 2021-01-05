@@ -55,14 +55,385 @@ plot_acf <- function(throughputs, type = c("acf", "pacf"),
 }
 ```
 
+## Uplink 
+
+Daten einlesen und nach Providern aufteilen
+
+```{r}
+ul_data = read.csv("../datasets/dataset_ul.csv", header = TRUE, sep=",", dec=".")
+ul_data <- na.omit(ul_data)
+ul_data$scenario <- factor(ul_data$scenario)
+
+vodafone <- ul_data[ul_data$provider == "vodafone", ]
+tmobile <- ul_data[ul_data$provider == "tmobile", ]
+o2 <- ul_data[ul_data$provider == "o2", ]
+providers <- list("vodafone" = vodafone, "tmobile" = tmobile, "o2" = o2)
+```
+
+Separiere Features
+
+```{r}
+features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db", "rssnr_db",
+              "cqi", "ta", "velocity_mps", "drive_id", "enodeb")
+lm_features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db", "rssnr_db",
+                 "cqi", "ta", "velocity_mps", "enodeb")
+```
+
+Aufteilung der Daten in Test und Training
+
+```{r}
+train <- lapply(providers, function(provider) 
+  provider[
+    provider["drive_id"] != 8 & provider["drive_id"] != 9 & 
+      provider["drive_id"] != 10, features])
+test <- lapply(providers, function(provider) 
+  provider[
+    provider["drive_id"] == 8 | provider["drive_id"] == 9 | 
+      provider["drive_id"] == 10, features])
+```
+
+Separiere numerische Features
+
+```{r}
+numeric_features <- lm_features[as.vector(unlist(lapply(train[[1]][, lm_features], 
+                                                        is.numeric)))]
+```
+
+ACF und PACF von "throughput_mbits", gibt es überhaupt Autokorrelation?
+
+```{r}
+throughputs <- list(vodafone = train$vodafone$throughput_mbits, 
+                    tmobile = train$tmobile$throughput_mbits, 
+                    o2 = train$o2$throughput_mbits)
+plot_acf(throughputs, type = "acf")
+```
+
+
+```{r}
+plot_acf(throughputs, type = "pacf")
+```
+
+Test auf Stationarität: Augmented Dickey-Fuller Test
+
+```{r warning=FALSE}
+for (j in c("vodafone", "o2", "tmobile")){
+  print(j)
+  for (i in numeric_features){
+    adf.test(train[[j]][,i])$p.value
+    print(i)
+    print(adf.test(train[[j]][,i])$p.value)
+  }
+}
+```
+
+Skalieren der Daten
+
+```{r}
+for (provider in c("vodafone", "tmobile", "o2")){
+  scaled <- scale(train[[provider]][, numeric_features])
+  train[[provider]][, numeric_features] <- scaled
+  attr(train[[provider]], "scaled:center") <- attr(scaled, "scaled:center")
+  attr(train[[provider]], "scaled:scale") <- attr(scaled, "scaled:scale")
+  test[[provider]][, numeric_features] <- scale(test[[provider]][, numeric_features], 
+                                                center = attr(scaled, "scaled:center"), 
+                                                scale = attr(scaled, "scaled:scale"))
+}
+```
+
+Test auf Multikollinearität mit dem VIF
+
+```{r}
+lm_vodafone <- lm(throughput_mbits ~ ., data = train[["vodafone"]][, lm_features])
+VIF(lm_vodafone)
+```
+
+```{r}
+lm_tmobile <- lm(throughput_mbits ~ ., data = train[["tmobile"]][, lm_features])
+VIF(lm_tmobile)
+```
+
+```{r}
+lm_o2 <- lm(throughput_mbits ~ ., data = train[["o2"]][, lm_features])
+VIF(lm_o2)
+```
+
+Überprüfen der Normalverteilungsannahme der Residuen
+
+```{r}
+res_tmobile <- data.frame(res = rstandard(lm_tmobile), 
+                          provider = "T-Mobile", 
+                          id = 1:length(rstandard(lm_tmobile)))
+res_vodafone <- data.frame(res = rstandard(lm_vodafone), 
+                           provider = "Vodafone", 
+                           id = 1:length(rstandard(lm_vodafone)))
+res_o2 <- data.frame(res = rstandard(lm_o2), 
+                     provider = "O2", 
+                     id = 1:length(rstandard(lm_o2)))
+
+res_data <- rbind(res_vodafone, res_tmobile, res_o2)
+```
+
+mit QQ-Plots
+
+```{r}
+ggplot(res_data, aes(x = id, y = res, color = provider)) + geom_point() + 
+  geom_abline(slope = 0, color = "black", size = 1, alpha = 0.8) +
+  facet_wrap(~provider, scales = "free_x") + 
+  xlab("") + ylab("Residuen") +
+  theme_grey(base_size = 20) + 
+  theme(legend.position = "none")
+```
+
+mit Scatterplots
+
+```{r}
+ggplot(res_data, aes(sample=res, color = provider)) + 
+  geom_qq() + 
+  geom_abline(intercept = 0, slope = 1, color = "black", size = 1, alpha = 0.8) + 
+  facet_wrap(~provider) + 
+  xlab("theoretische Quantile") + 
+  ylab("Quantile der Residuen" ) +
+  theme_grey(base_size = 20) + 
+  theme(legend.position = "none")
+```
+
+mit Histogrammen
+
+```{r}
+ggplot(res_data, aes(x = res, color = provider, fill = provider)) + 
+  geom_histogram() + 
+  facet_wrap(~ provider) + 
+  xlab("Residuen") + ylab("Anzahl") +
+  theme_grey(base_size = 20) + 
+  theme(legend.position = "none")
+```
+
+ACF und PACF der Residuen um das Grid zu bestimmen
+
+```{r}
+plot_data <- list(vodafone = lm_vodafone$residuals, 
+                  tmobile = lm_tmobile$residuals, 
+                  o2 = lm_o2$residuals)
+plot_acf(plot_data, type = "acf")
+```
+
+```{r}
+plot_acf(plot_data, type = "pacf")
+
+```
+
+Grid (p,q): VODAFONE: (0-2,0-4), O2: (0-6,0-5) und T-MOBILE: (0-6,0-6)
+
+```{r}
+max_ar <- 2
+max_ma <- 4 
+nrow = (max_ar+1)*(max_ma+1)
+grid_vodafone <- matrix(data = c(rep(0:max_ar, each=max_ma+1), rep(0, nrow), rep(0:max_ma, max_ar+1)), 
+                        nrow = nrow, ncol = 3)
+
+max_ar <- 6
+max_ma <- 5
+nrow = (max_ar+1)*(max_ma+1)
+grid_o2 <- matrix(data = c(rep(0:max_ar, each=max_ma+1), rep(0, nrow), rep(0:max_ma, max_ar+1)), 
+                  nrow = nrow, ncol = 3)
+
+max_ar <- 6
+max_ma <- 6
+nrow = (max_ar+1)*(max_ma+1)
+grid_tmobile <- matrix(data = c(rep(0:max_ar, each=max_ma+1), rep(0, nrow), rep(0:max_ma, max_ar+1)), 
+                       nrow = nrow, ncol = 3)
+
+grids <- list("vodafone" = grid_vodafone, 
+              "tmobile" = grid_tmobile, 
+              "o2" = grid_o2)
+```
+
+Kennzahlen: MSE, MAE, Rsquared, AIC
+
+```{r}
+vodafone_kennzahlen <- list("mse" = data.frame(), 
+                            "mae" = data.frame(), 
+                            "rsquared" = data.frame(),
+                            "aic" = data.frame())
+
+tmobile_kennzahlen <- list("mse" = data.frame(), 
+                           "mae" = data.frame(), 
+                           "rsquared" = data.frame(),
+                           "aic" = data.frame())
+o2_kennzahlen <- list("mse" = data.frame(), 
+                      "mae" = data.frame(), 
+                      "rsquared" = data.frame(),
+                      "aic" = data.frame())
+kennzahlen <- list("vodafone" = vodafone_kennzahlen, 
+                   "tmobile" = tmobile_kennzahlen, 
+                   "o2" = o2_kennzahlen,
+                   "aic" = data.frame())
+```
+
+Erzeugen der Kennzahlen für die verschiedenen Provider und Testfahrten 
+mit Zeitreihenkreuzvalidierung, sodass Fahrten 3:7 jeweils Test - 1 -> 1:(test_id-1) Training
+
+```{r}
+for (provider in c("vodafone", "tmobile", "o2")){
+  #train[[provider]]$enodeb <- as.character(train[[provider]]$enodeb)
+  #test[[provider]]$enodeb <- as.character(test[[provider]]$enodeb)
+  cv_train <- train[[provider]][
+    train[[provider]]["drive_id"] == 1 | train[[provider]]["drive_id"] == 2, 
+    lm_features
+  ] # erster Trainingsdatensatz - Erweitere diesen dann immer um den Testdatensatz
+  
+  all_mse <- data.frame(
+    matrix(rep(NA, 5*nrow(grids[[provider]])), nrow = nrow(grids[[provider]])), 
+    row.names = as.character(1:nrow(grids[[provider]]))  
+    # 5 Spalten (Anzahl Testsets der CV), nrow(grids[[provider]]) Zeilen (Anzahl Kombinationen) Zeilen
+  )
+  colnames(all_mse) <- c(paste("test_id", as.character(3:7), sep="_"))
+  # Spaltennamen: aktuelle Test Id
+  
+  all_mae <- data.frame(
+    matrix(rep(NA, 5*nrow(grids[[provider]])), nrow=nrow(grids[[provider]])), 
+    row.names = as.character(1:nrow(grids[[provider]]))
+  )
+  colnames(all_mae) <- c(paste("test_id", as.character(3:7), sep="_"))
+  
+  all_rsquared <- data.frame(
+    matrix(rep(NA, 5*nrow(grids[[provider]])), nrow=nrow(grids[[provider]])), 
+    row.names = as.character(1:nrow(grids[[provider]]))
+  )
+  colnames(all_rsquared) <- c(paste("test_id", as.character(3:7), sep="_"))
+  
+  all_aic <- data.frame(
+    matrix(rep(NA, 5*nrow(grids[[provider]])), nrow=nrow(grids[[provider]])), 
+    row.names = as.character(1:nrow(grids[[provider]]))
+  )
+  colnames(all_aic) <- c(paste("test_id", as.character(3:7), sep="_"))
+  
+  for (test_id in 3:7){
+    
+    if(test_id > 3){
+      cv_train <- rbind(cv_train, 
+                        train[[provider]][
+                          train[[provider]]["drive_id"] == test_id-1, lm_features
+                        ])
+    }
+    cv_test <- train[[provider]][train[[provider]]["drive_id"] == test_id, lm_features]
+    
+    
+    
+    for (row in 1:nrow(grids[[provider]])){ # für jede Kombination aus dem Grid
+      ## fit model
+      y <- ts(cv_train[, "throughput_mbits"]) # konstruiere Zeitreihe
+      xreg <- cv_train[, lm_features[-which(lm_features == "throughput_mbits")]] 
+      #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
+      # Dummy codierung wenn nötig 
+      xreg <- data.matrix(xreg)
+      # konvertiere alle variablen zu numerischen variablen und 
+      # Zusammenführen zu Spalten einer Matrix
+      arima_fit <- Arima(y = y, order = grids[[provider]][row,], xreg = xreg, method = "ML")
+      # fitte ein Arima Modell (wobei d = 0)
+      
+      
+      ## predict
+      y <- ts(cv_test[, "throughput_mbits"])
+      xreg <- cv_test[, lm_features[-which(lm_features == "throughput_mbits")]]
+      #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
+      xreg <- data.matrix(xreg)
+      pred <- forecast(arima_fit, xreg = xreg)
+      #res <- unclass(y) - unclass(pred$mean)
+      all_mse[row, paste("test_id", test_id, sep = "_")] <- mse(unclass(y), unclass(pred$mean))
+      all_mae[row, paste("test_id", test_id, sep = "_")] <- mae(unclass(y), unclass(pred$mean))
+      all_rsquared[row, paste("test_id", test_id, sep = "_")] <- 1 -
+        sum((unclass(pred$mean)-unclass(y))^2)/sum((mean(unclass(y))-unclass(y))^2)
+      all_aic[row, paste("test_id", test_id, sep = "_")] <- pred$model$aic
+      # cor(unclass(y), unclass(pred$mean))^2
+      # yq <- mean(y.test), R2 <- sum((pred.cv-yq)^2)/sum((y.test-yq)^2)
+    }
+    kennzahlen[[provider]]$mse <- all_mse
+    kennzahlen[[provider]]$mae <- all_mae
+    kennzahlen[[provider]]$rsquared <- all_rsquared
+    kennzahlen[[provider]]$aic <- all_aic
+    
+  }
+}
+```
+
+Suche für jeden Provider die Kombination heraus, welche die besten Kennzahlen erzeugt
+
+```{r}
+grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mae))[[1]], ]
+grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mse))[[1]], ]
+grids[["vodafone"]][which.max(rowMeans(kennzahlen$vodafone$rsquared))[[1]], ]
+grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$aic))[[1]], ]
+param_vodafone <- grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mae))[[1]], ]
+
+grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mae))[[1]], ]
+grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mse))[[1]], ]
+grids[["tmobile"]][which.max(rowMeans(kennzahlen$tmobile$rsquared))[[1]], ]
+grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$aic))[[1]], ]
+param_tmobile <- grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mae))[[1]], ]
+
+grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mae))[[1]], ]
+grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mse))[[1]], ]
+grids[["o2"]][which.max(rowMeans(kennzahlen$o2$rsquared))[[1]], ]
+grids[["o2"]][which.min(rowMeans(kennzahlen$o2$aic))[[1]], ]
+param_o2 <- grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mae))[[1]], ]
+
+parameter <- list("vodafone" = param_vodafone, 
+                  "tmobile" = param_tmobile, 
+                  "o2" = param_o2)
+print(parameter)
+```
+
+
+Modell für den kompletten Trainingsdatensatz fitten und für Test predicten und
+Predictions zurücktransformieren
+
+```{r}
+kennzahlen_final <- list("vodafone" = list(), 
+                         "tmobile" = list(), 
+                         "o2" = list())
+predictions <- list("vodafone" = list(), 
+                    "tmobile" = list(), 
+                    "o2" = list())
+coeff <- list("vodafone" = list(), 
+              "tmobile" = list(), 
+              "o2" = list())
+
+for (provider in c("vodafone", "tmobile", "o2")){
+  y <- ts(train[[provider]][, "throughput_mbits"])
+  xreg <- train[[provider]][, lm_features[-which(lm_features == "throughput_mbits")]]
+  #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
+  xreg <- data.matrix(xreg)
+  arima_fit <- Arima(y = y, order = parameter[[provider]], xreg = xreg, method = "ML")
+  coeff[[provider]] <- arima_fit$coef[c("intercept",lm_features[-which(lm_features ==
+                                                                         "throughput_mbits")])]
+  # predict
+  y <- ts(test[[provider]][, "throughput_mbits"])
+  xreg <- test[[provider]][, lm_features[-which(lm_features == "throughput_mbits")]]
+  #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
+  xreg <- data.matrix(xreg)
+  predictions[[provider]] <- forecast(arima_fit, xreg = xreg) 
+  predictions[[provider]]$rescaled_forecast <- predictions[[provider]]$mean * attr(train[[provider]],
+                                                                                   "scaled:scale")["throughput_mbits"] + 
+    attr(train[[provider]], "scaled:center")["throughput_mbits"]
+  predictions[[provider]]$rescaled_y <- y * attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
+    attr(train[[provider]], "scaled:center")["throughput_mbits"]
+  rescaled_y <- unclass(predictions[[provider]]$rescaled_y)
+  rescaled_forecast <- unclass(predictions[[provider]]$rescaled_forecast)
+  kennzahlen_final[[provider]]$mse <- mse(rescaled_y, rescaled_forecast)
+  kennzahlen_final[[provider]]$mae <- mae(rescaled_y, rescaled_forecast)
+  kennzahlen_final[[provider]]$rsquared <- 1 - sum((rescaled_forecast-rescaled_y)^2)/
+    sum((mean(rescaled_y)-rescaled_y)^2) 
+}
+```
+
 
 ## Downlink 
 
 Daten einlesen und nach Providern aufteilen
 
 ```{r}
-#setwd("~/GitHub/fallstudien_2_projekt_1/datasets")
-#dl_data <- read.csv2("dataset_dl.csv", header=TRUE, sep=",", dec=".") 
+dl_data = read.csv("../datasets/dataset_dl.csv", header = TRUE, sep=",", dec=".")
 dl_data <- na.omit(dl_data)
 dl_data$scenario <- factor(dl_data$scenario)
 
@@ -75,7 +446,7 @@ providers <- list("vodafone" = vodafone, "tmobile" = tmobile, "o2" = o2)
 Separiere die Features
 
 ```{r}
-features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db", "rssnr_db", #"scenario"
+features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db", "rssnr_db",
               "cqi", "ta", "velocity_mps", "drive_id", "enodeb")
 lm_features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db", "rssnr_db",
                  "cqi", "ta", "velocity_mps", "enodeb")
@@ -108,22 +479,22 @@ ACF und PACF von "throughput_mbits", gibt es überhaupt Autokorrelation?
 throughputs <- list(vodafone = train$vodafone$throughput_mbits, 
                     tmobile = train$tmobile$throughput_mbits, 
                     o2 = train$o2$throughput_mbits)
-plot_acf(throughputs, type = "acf", 
-         title = "Autokorrelationsfunktionen der Variable 'throughput_mbits' - Downlink")
+plot_acf(throughputs, type = "acf")
 ```
 
 ```{r}
-plot_acf(throughputs, type = "pacf", 
-         title = "partielle Autokorrelationsfunktionen der Variable 'throughput_mbits' - Downlink")
+plot_acf(throughputs, type = "pacf")
 
 ```
 
 Test auf Stationarität: Augmented Dickey-Fuller Test
 
-```{r}
+```{r warning = FALSE}
 for (j in c("vodafone", "o2", "tmobile")){
+  print(j)
   for (i in numeric_features){
     adf.test(train[[j]][,i])$p.value
+    print(i)
     print(adf.test(train[[j]][,i])$p.value)
   }
 }
@@ -218,15 +589,15 @@ ACF und PACF der Residuen um das Grid zu bestimmen
 plot_data <- list(vodafone = lm_vodafone$residuals, 
                         tmobile = lm_tmobile$residuals, 
                         o2 = lm_o2$residuals)
-plot_acf(plot_data, type = "acf", 
-         title = "Autokorrelationsfunktionen der Residuen - Downlink")
+plot_acf(plot_data, type = "acf")
 ``` 
 
 ```{r}
-plot_acf(plot_data, type = "pacf", 
-         title = "partielle Autokorrelationsfunktionen der Residuen - Downlink")
+plot_acf(plot_data, type = "pacf")
 ``` 
+
 Grid (p,q): VODAFONE: (0-7,0-7), O2: (0-2,0-10) und T-MOBILE: (0-1,0-2)
+
 ```{r}
 max_ar <- 7
 max_ma <- 7
@@ -383,7 +754,7 @@ param_o2 <- grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mae))[[1]], ]
 parameter <- list("vodafone" = param_vodafone, 
                   "tmobile" = param_tmobile, 
                   "o2" = param_o2)
-parameter
+print(parameter)
 ```
 
 Modell für den kompletten Trainingsdatensatz fitten und für Test predicten und
@@ -406,14 +777,16 @@ for (provider in c("tmobile", "o2", "vodafone")){
   #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
   xreg <- data.matrix(xreg)
   arima_fit <- Arima(y = y, order = parameter[[provider]], xreg = xreg, method = "ML")
-  coeff[[provider]] <- arima_fit$coef[c("intercept",lm_features[-which(lm_features == "throughput_mbits")])]
+  coeff[[provider]] <- arima_fit$coef[c("intercept",lm_features[-which(lm_features ==
+                                                                         "throughput_mbits")])]
   # predict
   y <- ts(test[[provider]][, "throughput_mbits"])
   xreg <- test[[provider]][, lm_features[-which(lm_features == "throughput_mbits")]]
   #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
   xreg <- data.matrix(xreg)
   predictions[[provider]] <- forecast(arima_fit, xreg = xreg) 
-  predictions[[provider]]$rescaled_forecast <- predictions[[provider]]$mean * attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
+  predictions[[provider]]$rescaled_forecast <- predictions[[provider]]$mean * attr(train[[provider]],
+                                                                                   "scaled:scale")["throughput_mbits"] +
     attr(train[[provider]], "scaled:center")["throughput_mbits"]
   predictions[[provider]]$rescaled_y <- y * attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
     attr(train[[provider]], "scaled:center")["throughput_mbits"]
@@ -423,384 +796,5 @@ for (provider in c("tmobile", "o2", "vodafone")){
   kennzahlen_final[[provider]]$mae <- mae(rescaled_y, rescaled_forecast)
   kennzahlen_final[[provider]]$rsquared <- 1 - sum((rescaled_forecast-rescaled_y)^2)/
                                                  sum((mean(rescaled_y)-rescaled_y)^2) 
-}
-```
-
-
-## Uplink 
-
-Daten einlesen und nach Providern aufteilen
-
-```{r}
-#setwd("~/GitHub/fallstudien_2_projekt_1/datasets")
-#ul_data <- read.csv2("dataset_ul.csv", header=TRUE, sep=",", dec=".")
-ul_data <- na.omit(ul_data)
-ul_data$scenario <- factor(ul_data$scenario)
-
-vodafone <- ul_data[ul_data$provider == "vodafone", ]
-tmobile <- ul_data[ul_data$provider == "tmobile", ]
-o2 <- ul_data[ul_data$provider == "o2", ]
-providers <- list("vodafone" = vodafone, "tmobile" = tmobile, "o2" = o2)
-```
-
-Separiere Features
-
-```{r}
-features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db", "rssnr_db",
-              "cqi", "ta", "velocity_mps", "drive_id", "enodeb")
-lm_features <- c("throughput_mbits", "payload_mb", "f_mhz", "rsrp_dbm", "rsrq_db", "rssnr_db",
-                 "cqi", "ta", "velocity_mps", "enodeb")
-```
-
-Aufteilung der Daten in Test und Training
-
-```{r}
-train <- lapply(providers, function(provider) 
-  provider[
-    provider["drive_id"] != 8 & provider["drive_id"] != 9 & 
-      provider["drive_id"] != 10, features])
-test <- lapply(providers, function(provider) 
-  provider[
-    provider["drive_id"] == 8 | provider["drive_id"] == 9 | 
-      provider["drive_id"] == 10, features])
-```
-
-Separiere numerische Features
-
-```{r}
-numeric_features <- lm_features[as.vector(unlist(lapply(train[[1]][, lm_features], 
-                                                        is.numeric)))]
-```
-
-ACF und PACF von "throughput_mbits", gibt es überhaupt Autokorrelation?
-
-```{r}
-throughputs <- list(vodafone = train$vodafone$throughput_mbits, 
-                    tmobile = train$tmobile$throughput_mbits, 
-                    o2 = train$o2$throughput_mbits)
-plot_acf(throughputs, type = "acf", 
-         title = "Autokorrelationsfunktionen der Variable 'throughput_mbits' - Uplink")
-```
-
-
-
-```{r}
-plot_acf(throughputs, type = "pacf", 
-         title = "partielle Autokorrelationsfunktionen der Variable 'throughput_mbits' - Uplink")
-```
-
-Test auf Stationarität: AugmentedDickey-Fuller Test
-
-```{r}
-for (j in c("vodafone", "o2", "tmobile")){
-  print(j)
-  for (i in numeric_features){
-    adf.test(train[[j]][,i])$p.value
-    print(i)
-    print(adf.test(train[[j]][,i])$p.value)
-  }
-}
-```
-
-Skalieren der Daten
-
-```{r}
-for (provider in c("vodafone", "tmobile", "o2")){
-  scaled <- scale(train[[provider]][, numeric_features])
-  train[[provider]][, numeric_features] <- scaled
-  attr(train[[provider]], "scaled:center") <- attr(scaled, "scaled:center")
-  attr(train[[provider]], "scaled:scale") <- attr(scaled, "scaled:scale")
-  test[[provider]][, numeric_features] <- scale(test[[provider]][, numeric_features], 
-                                                center = attr(scaled, "scaled:center"), 
-                                                scale = attr(scaled, "scaled:scale"))
-}
-```
-
-Test auf Multikollinearität mit dem VIF
-
-```{r}
-lm_vodafone <- lm(throughput_mbits ~ ., data = train[["vodafone"]][, lm_features])
-VIF(lm_vodafone)
-```
-
-```{r}
-lm_tmobile <- lm(throughput_mbits ~ ., data = train[["tmobile"]][, lm_features])
-VIF(lm_tmobile)
-```
-
-```{r}
-lm_o2 <- lm(throughput_mbits ~ ., data = train[["o2"]][, lm_features])
-VIF(lm_o2)
-```
-
-Überprüfen der Normalverteilungsannahme der Residuen
-
-```{r}
-res_tmobile <- data.frame(res = rstandard(lm_tmobile), 
-                          provider = "T-Mobile", 
-                          id = 1:length(rstandard(lm_tmobile)))
-res_vodafone <- data.frame(res = rstandard(lm_vodafone), 
-                           provider = "Vodafone", 
-                           id = 1:length(rstandard(lm_vodafone)))
-res_o2 <- data.frame(res = rstandard(lm_o2), 
-                     provider = "O2", 
-                     id = 1:length(rstandard(lm_o2)))
-
-res_data <- rbind(res_vodafone, res_tmobile, res_o2)
-```
-
-mit QQ-Plots
-
-```{r}
-ggplot(res_data, aes(x = id, y = res, color = provider)) + geom_point() + 
-  geom_abline(slope = 0, color = "black", size = 1, alpha = 0.8) +
-  facet_wrap(~provider, scales = "free_x") + 
-  ggtitle("Scatterplot der Residuen - Uplink") + 
-  xlab("") + ylab("Residuen") +
-  theme_grey(base_size = 20) + 
-  theme(legend.position = "none")
-```
-
-mit Scatterplots
-
-```{r}
-ggplot(res_data, aes(sample=res, color = provider)) + 
-  geom_qq() + 
-  geom_abline(intercept = 0, slope = 1, color = "black", size = 1, alpha = 0.8) + 
-  facet_wrap(~provider) + 
-  ggtitle("QQ-Plots Normalverteilung - Uplink") + 
-  xlab("theoretische Quantile") + 
-  ylab("Quantile der Residuen" ) +
-  theme_grey(base_size = 20) + 
-  theme(legend.position = "none")
-```
-
-mit Histogrammen
-
-```{r}
-ggplot(res_data, aes(x = res, color = provider, fill = provider)) + 
-  geom_histogram() + 
-  facet_wrap(~ provider) + 
-  ggtitle("Histogramme der Residuen - Uplink") + 
-  xlab("Residuen") + ylab("Anzahl") +
-  theme_grey(base_size = 20) + 
-  theme(legend.position = "none")
-```
-
-ACF und PACF der Residuen um das Grid zu bestimmen
-
-```{r}
-plot_data <- list(vodafone = lm_vodafone$residuals, 
-                  tmobile = lm_tmobile$residuals, 
-                  o2 = lm_o2$residuals)
-plot_acf(plot_data, type = "acf", 
-         title = "Autokorrelationsfunktionen der Residuen - Uplink")
-```
-
-```{r}
-plot_acf(plot_data, type = "pacf", 
-         title = "partielle Autokorrelationsfunktionen der Residuen - Uplink")
-
-```
-
-Grid (p,q): VODAFONE: (0-2,0-4), O2: (0-6,0-5) und T-MOBILE: (0-6,0-6)
-
-```{r}
-max_ar <- 2
-max_ma <- 4 
-nrow = (max_ar+1)*(max_ma+1)
-grid_vodafone <- matrix(data = c(rep(0:max_ar, each=max_ma+1), rep(0, nrow), rep(0:max_ma, max_ar+1)), 
-                        nrow = nrow, ncol = 3)
-
-max_ar <- 6
-max_ma <- 5
-nrow = (max_ar+1)*(max_ma+1)
-grid_o2 <- matrix(data = c(rep(0:max_ar, each=max_ma+1), rep(0, nrow), rep(0:max_ma, max_ar+1)), 
-                  nrow = nrow, ncol = 3)
-
-max_ar <- 6
-max_ma <- 6
-nrow = (max_ar+1)*(max_ma+1)
-grid_tmobile <- matrix(data = c(rep(0:max_ar, each=max_ma+1), rep(0, nrow), rep(0:max_ma, max_ar+1)), 
-                       nrow = nrow, ncol = 3)
-
-grids <- list("vodafone" = grid_vodafone, 
-              "tmobile" = grid_tmobile, 
-              "o2" = grid_o2)
-```
-
-Kennzahlen: MSE, MAE, Rsquared, AIC
-
-```{r}
-vodafone_kennzahlen <- list("mse" = data.frame(), 
-                            "mae" = data.frame(), 
-                            "rsquared" = data.frame(),
-                            "aic" = data.frame())
-
-tmobile_kennzahlen <- list("mse" = data.frame(), 
-                           "mae" = data.frame(), 
-                           "rsquared" = data.frame(),
-                           "aic" = data.frame())
-o2_kennzahlen <- list("mse" = data.frame(), 
-                      "mae" = data.frame(), 
-                      "rsquared" = data.frame(),
-                      "aic" = data.frame())
-kennzahlen <- list("vodafone" = vodafone_kennzahlen, 
-                   "tmobile" = tmobile_kennzahlen, 
-                   "o2" = o2_kennzahlen,
-                   "aic" = data.frame())
-```
-
-Erzeugen der Kennzahlen für die verschiedenen Provider und Testfahrten 
-mit Zeitreihenkreuzvalidierung, sodass Fahrten 3:7 jeweils Test - 1 -> 1:(test_id-1) Training
-
-```{r}
-for (provider in c("vodafone", "tmobile", "o2")){
-  #train[[provider]]$enodeb <- as.character(train[[provider]]$enodeb)
-  #test[[provider]]$enodeb <- as.character(test[[provider]]$enodeb)
-  cv_train <- train[[provider]][
-    train[[provider]]["drive_id"] == 1 | train[[provider]]["drive_id"] == 2, 
-    lm_features
-  ] # erster Trainingsdatensatz - Erweitere diesen dann immer um den Testdatensatz
-  
-  all_mse <- data.frame(
-    matrix(rep(NA, 5*nrow(grids[[provider]])), nrow = nrow(grids[[provider]])), 
-    row.names = as.character(1:nrow(grids[[provider]]))  
-    # 5 Spalten (Anzahl Testsets der CV), nrow(grids[[provider]]) Zeilen (Anzahl Kombinationen) Zeilen
-  )
-  colnames(all_mse) <- c(paste("test_id", as.character(3:7), sep="_"))
-  # Spaltennamen: aktuelle Test Id
-  
-  all_mae <- data.frame(
-    matrix(rep(NA, 5*nrow(grids[[provider]])), nrow=nrow(grids[[provider]])), 
-    row.names = as.character(1:nrow(grids[[provider]]))
-  )
-  colnames(all_mae) <- c(paste("test_id", as.character(3:7), sep="_"))
-  
-  all_rsquared <- data.frame(
-    matrix(rep(NA, 5*nrow(grids[[provider]])), nrow=nrow(grids[[provider]])), 
-    row.names = as.character(1:nrow(grids[[provider]]))
-  )
-  colnames(all_rsquared) <- c(paste("test_id", as.character(3:7), sep="_"))
-  
-  all_aic <- data.frame(
-    matrix(rep(NA, 5*nrow(grids[[provider]])), nrow=nrow(grids[[provider]])), 
-    row.names = as.character(1:nrow(grids[[provider]]))
-  )
-  colnames(all_aic) <- c(paste("test_id", as.character(3:7), sep="_"))
-  
-  for (test_id in 3:7){
-    
-    if(test_id > 3){
-      cv_train <- rbind(cv_train, 
-                        train[[provider]][
-                          train[[provider]]["drive_id"] == test_id-1, lm_features
-                        ])
-    }
-    cv_test <- train[[provider]][train[[provider]]["drive_id"] == test_id, lm_features]
-    
-    
-    
-    for (row in 1:nrow(grids[[provider]])){ # für jede Kombination aus dem Grid
-      ## fit model
-      y <- ts(cv_train[, "throughput_mbits"]) # konstruiere Zeitreihe
-      xreg <- cv_train[, lm_features[-which(lm_features == "throughput_mbits")]] 
-      #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
-      # Dummy codierung wenn nötig 
-      xreg <- data.matrix(xreg)
-      # konvertiere alle variablen zu numerischen variablen und 
-      # Zusammenführen zu Spalten einer Matrix
-      arima_fit <- Arima(y = y, order = grids[[provider]][row,], xreg = xreg, method = "ML")
-      # fitte ein Arima Modell (wobei d = 0)
-      
-      
-      ## predict
-      y <- ts(cv_test[, "throughput_mbits"])
-      xreg <- cv_test[, lm_features[-which(lm_features == "throughput_mbits")]]
-      #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
-      xreg <- data.matrix(xreg)
-      pred <- forecast(arima_fit, xreg = xreg)
-      #res <- unclass(y) - unclass(pred$mean)
-      all_mse[row, paste("test_id", test_id, sep = "_")] <- mse(unclass(y), unclass(pred$mean))
-      all_mae[row, paste("test_id", test_id, sep = "_")] <- mae(unclass(y), unclass(pred$mean))
-      all_rsquared[row, paste("test_id", test_id, sep = "_")] <- 1 - sum((unclass(pred$mean)-unclass(y))^2)/sum((mean(unclass(y))-unclass(y))^2)
-      all_aic[row, paste("test_id", test_id, sep = "_")] <- pred$model$aic
-      # cor(unclass(y), unclass(pred$mean))^2
-      # yq <- mean(y.test), R2 <- sum((pred.cv-yq)^2)/sum((y.test-yq)^2)
-    }
-    kennzahlen[[provider]]$mse <- all_mse
-    kennzahlen[[provider]]$mae <- all_mae
-    kennzahlen[[provider]]$rsquared <- all_rsquared
-    kennzahlen[[provider]]$aic <- all_aic
-    
-  }
-}
-```
-
-Suche für jeden Provider die Kombination heraus, welche die besten Kennzahlen erzeugt
-
-```{r}
-grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mae))[[1]], ]
-grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mse))[[1]], ]
-grids[["vodafone"]][which.max(rowMeans(kennzahlen$vodafone$rsquared))[[1]], ]
-grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$aic))[[1]], ]
-param_vodafone <- grids[["vodafone"]][which.min(rowMeans(kennzahlen$vodafone$mae))[[1]], ]
-
-grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mae))[[1]], ]
-grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mse))[[1]], ]
-grids[["tmobile"]][which.max(rowMeans(kennzahlen$tmobile$rsquared))[[1]], ]
-grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$aic))[[1]], ]
-param_tmobile <- grids[["tmobile"]][which.min(rowMeans(kennzahlen$tmobile$mae))[[1]], ]
-
-grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mae))[[1]], ]
-grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mse))[[1]], ]
-grids[["o2"]][which.max(rowMeans(kennzahlen$o2$rsquared))[[1]], ]
-grids[["o2"]][which.min(rowMeans(kennzahlen$o2$aic))[[1]], ]
-param_o2 <- grids[["o2"]][which.min(rowMeans(kennzahlen$o2$mae))[[1]], ]
-
-parameter <- list("vodafone" = param_vodafone, 
-                  "tmobile" = param_tmobile, 
-                  "o2" = param_o2)
-parameter 
-```
-
-
-Modell für den kompletten Trainingsdatensatz fitten und für Test predicten und
-Predictions zurücktransformieren
-
-```{r}
-kennzahlen_final <- list("vodafone" = list(), 
-                         "tmobile" = list(), 
-                         "o2" = list())
-predictions <- list("vodafone" = list(), 
-                    "tmobile" = list(), 
-                    "o2" = list())
-coeff <- list("vodafone" = list(), 
-              "tmobile" = list(), 
-              "o2" = list())
-
-for (provider in c("vodafone", "tmobile", "o2")){
-  y <- ts(train[[provider]][, "throughput_mbits"])
-  xreg <- train[[provider]][, lm_features[-which(lm_features == "throughput_mbits")]]
-  #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
-  xreg <- data.matrix(xreg)
-  arima_fit <- Arima(y = y, order = parameter[[provider]], xreg = xreg, method = "ML")
-  coeff[[provider]] <- arima_fit$coef[c("intercept",lm_features[-which(lm_features == "throughput_mbits")])]
-  # predict
-  y <- ts(test[[provider]][, "throughput_mbits"])
-  xreg <- test[[provider]][, lm_features[-which(lm_features == "throughput_mbits")]]
-  #xreg <- dummy_cols(xreg, remove_first_dummy = TRUE, remove_selected_columns = TRUE)
-  xreg <- data.matrix(xreg)
-  predictions[[provider]] <- forecast(arima_fit, xreg = xreg) 
-  predictions[[provider]]$rescaled_forecast <- predictions[[provider]]$mean * attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
-    attr(train[[provider]], "scaled:center")["throughput_mbits"]
-  predictions[[provider]]$rescaled_y <- y * attr(train[[provider]], "scaled:scale")["throughput_mbits"] + 
-    attr(train[[provider]], "scaled:center")["throughput_mbits"]
-  rescaled_y <- unclass(predictions[[provider]]$rescaled_y)
-  rescaled_forecast <- unclass(predictions[[provider]]$rescaled_forecast)
-  kennzahlen_final[[provider]]$mse <- mse(rescaled_y, rescaled_forecast)
-  kennzahlen_final[[provider]]$mae <- mae(rescaled_y, rescaled_forecast)
-  kennzahlen_final[[provider]]$rsquared <- 1 - sum((rescaled_forecast-rescaled_y)^2)/
-    sum((mean(rescaled_y)-rescaled_y)^2) 
 }
 ```
